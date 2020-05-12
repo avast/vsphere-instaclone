@@ -1,0 +1,7 @@
+{
+    "image-name": {
+        "template": "datacenter/vm/tc-agent-template",
+        "instanceFolder": "datacenter/vm/tc-agents",
+        "maxInstances": 10
+    }
+}

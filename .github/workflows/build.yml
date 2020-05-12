@@ -1,0 +1,48 @@
+name: build
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: avakar/derive-version@v1.0.0
+      id: version
+    - uses: actions/cache@v1.1.2
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-maven-
+    - run: mvn -B versions:set -DnewVersion='${{ steps.version.outputs.version }}'-g"$(git rev-parse --short HEAD)"
+      if: ${{ github.ref != 'refs/heads/master' }}
+    - run: mvn -B versions:set -DnewVersion='${{ steps.version.outputs.version }}'
+      if: ${{ github.ref == 'refs/heads/master' }}
+    - run: mvn -B package
+    - uses: actions/upload-artifact@v2
+      with:
+        name: bin
+        path: target/vsphere-instaclone.zip
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+  release:
+    needs: build
+    if: ${{ github.ref == 'refs/heads/master' }}
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+    - uses: actions/download-artifact@v2
+      with:
+        name: bin
+    - uses: actions/create-release@v1
+      id: create_release
+      with:
+        tag_name: v${{ needs.build.outputs.version }}
+        release_name: v${{ needs.build.outputs.version }}
+    - uses: actions/upload-release-asset@v1.0.2
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./vsphere-instaclone.zip
+        asset_name: vsphere-instaclone.zip
+        asset_content_type: application/zip
