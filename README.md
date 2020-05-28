@@ -4,17 +4,17 @@ Use VMware instant clone technology to spawn TeamCity cloud agent quickly.
 
 ## Installation
 
-1. Download the plugin .zip file from this repo's releases.
-2. Upload it to TeamCity.
+1. Download the plugin .zip file from this [repo's releases](https://github.com/avast/vsphere-instaclone/releases).
+2. Upload it to TeamCity (Administration -> Plugins list -> Upload plugin zip).
 
 ## Server Configuration
 
 Create a new cloud profile in your project and set its type to vSphere Instaclone.
-Fill in the path to the vSphere API, this is typically "https://my.vsphere.host/sdk".
+Fill in the path to the vSphere API, this is typically of the form "https://my.vsphere.host/sdk".
 Note that if your company is too lazy to get the real certificate for that URL,
-you'll need to install the appropriate root certificate to cacerts store
+you'll need to install the appropriate certificate to cacerts store
 of your TeamCity's JRE. I'm purposefully leaving out the detailed instructions
-in the hopes that obtaining a trusted cert is easier than googling them.
+in the hopes that obtaining a trusted cert is easier.
 
 Fill in username and password; the account must have sufficient privileges
 to search for machines and perform the instant clone operation:
@@ -38,12 +38,11 @@ Finally, provide one or more image configurations.
         }
     }
 
-For each image, `template` specifies path to the virtual machine to clone.
-On vSphere, this path always starts with the name of the datacenter, followed by
-"vm".
+For each image, `template` specifies the path to the virtual machine to clone.
+On vSphere, this path always starts with the name of the datacenter, followed by "vm".
 
 The key `instanceFolder` specifies the vSphere folder in which cloned machines should
-be placed. This can be the same folder as your template.
+be placed. This can be the folder your template resides in.
 The name of the image is used as a base for the names of the cloned images.
 
 The plugin will not allow more than `maxInstances` instances to run simultaneously.
@@ -63,18 +62,18 @@ array of network names.
 3. Install the TeamCity agent and connect it to TeamCity.
 4. *Let it upgrade*. This is very important, you don't want the agent upgrading post-clone.
    Also, this plugin must be installed on the server so that the agent can pick it up.
-5. Once ready, modify agent's `build.properties` file by
+5. Once ready, modify the agent's `build.properties` file by
    * deleting the authentication token (this ensures that each clone gets a new one) and by
    * setting `vmware.freeze.script` to a path to your freeze script (see below).
 6. Wait a little. The agent will pick up the changes and restart. Just before registering
-   to TeamCity server, the agent will execute the freeze script, which should freeze your VM.
+   to your TeamCity server, the agent will execute the freeze script, which should freeze your VM.
    Once cloned, the freeze script continues executing on the new machine.
 
 ## Agent configuration
 
 The agent needs access to `rpctool` from VMware tools.
 Usually, the agent will find the tool automatically, unless it's installed in an unusual path.
-In that case, set `teamcity.vmware.rpctool.path` property in `build.properties`
+In that case, set the `teamcity.vmware.rpctool.path` property in `build.properties`
 to the path to the `rpctool` executable.
 
 Setting `vmware.freeze.script` will cause the agent to execute it during the next agent startup.
@@ -82,7 +81,7 @@ Setting `vmware.freeze.script` will cause the agent to execute it during the nex
 ## The Freeze Script
 
 The simplest freeze script only performs the freeze, but you probably also want
-to restart networking, so as to have new clones pick up new IP address.
+to restart networking, so as to have new clones pick up a new IP address.
 On Windows, the script might be a .bat file and look like this.
 
     netsh interface set interface "Ethernet0" disable
