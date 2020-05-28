@@ -67,7 +67,8 @@ class ICCloudInstance(
     private suspend fun powerOn(name: String, userData: CloudInstanceUserData): ManagedObjectReference {
         val extraConfig = HashMap<String, String>().apply {
             val data = JSONObject().apply {
-                put("agentName", userData.agentName)
+                val agentName = userData.agentName
+                put("agentName", if (agentName.isEmpty()) name else agentName)
                 put("authToken", userData.authToken)
                 put("serverUrl", userData.serverAddress)
                 put("configParams", JSONObject().apply {

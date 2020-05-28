@@ -13,6 +13,12 @@
     <dependencies>
         <dependency>
             <groupId>org.jetbrains.teamcity</groupId>
+            <artifactId>agent-api</artifactId>
+            <version>${teamcity-version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.teamcity</groupId>
             <artifactId>server-api</artifactId>
             <version>${teamcity-version}</version>
             <scope>provided</scope>

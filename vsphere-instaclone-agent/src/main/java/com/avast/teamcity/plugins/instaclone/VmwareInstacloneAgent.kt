@@ -19,7 +19,7 @@ class VmwareInstacloneAgent(lifeCycleEvents: EventDispatcher<AgentLifeCycleListe
     }
 
     private fun initializeVmInstance(agent: BuildAgent) {
-        val config = agent.configuration
+        val config = agent.configuration as BuildAgentConfigurationEx
         val rpcToolPath = findRpcTool(config)
         if (rpcToolPath == null) {
             LOG.info("rpctool wasn't found")
@@ -75,6 +75,11 @@ class VmwareInstacloneAgent(lifeCycleEvents: EventDispatcher<AgentLifeCycleListe
         val configParams = instanceConfig.getJSONObject("configParams")
         for (key in configParams.keySet()) {
             config.addConfigurationParameter(key, configParams.getString(key))
+        }
+
+        val agentName = instanceConfig.optString("agentName")
+        if (agentName != null) {
+            config.name = agentName
         }
     }
 
