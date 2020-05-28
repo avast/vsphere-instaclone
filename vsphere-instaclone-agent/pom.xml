@@ -12,6 +12,13 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.avast.teamcity.plugins</groupId>
+            <artifactId>teamcity-stubs</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
             <version>20190722</version>
