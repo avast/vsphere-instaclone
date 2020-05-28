@@ -6,6 +6,7 @@ import jetbrains.buildServer.clouds.*
 import jetbrains.buildServer.clouds.server.CloudEventAdapter
 import jetbrains.buildServer.clouds.server.CloudEventDispatcher
 import jetbrains.buildServer.serverSide.*
+import jetbrains.buildServer.serverSide.agentPools.AgentPoolManager
 import jetbrains.buildServer.web.openapi.PluginDescriptor
 import org.apache.commons.io.IOUtils
 import java.io.IOException
@@ -16,6 +17,7 @@ class ICCloudClientFactory(
         private val pluginDescriptor: PluginDescriptor,
         cloudRegistrar: CloudRegistrar,
         cloudEventDispatcher: CloudEventDispatcher,
+        private val agentPoolManager: AgentPoolManager,
         private val buildAgentManager: BuildAgentManager) : CloudClientFactory {
 
     private val defaultImagesJson: String = try {
@@ -62,7 +64,7 @@ class ICCloudClientFactory(
         val password = cloudClientParameters.getParameter("vmwareInstaclonePassword")!!
         val imageConfig = cloudClientParameters.getParameter("vmwareInstacloneImages")!!
         val vim = VimWrapper(port, username, password)
-        return ICCloudClient(vim, buildAgentManager, profileUuid, imageConfig)
+        return ICCloudClient(vim, buildAgentManager, agentPoolManager, profileUuid, imageConfig)
     }
 
     override fun getCloudCode(): String {

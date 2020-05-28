@@ -14,6 +14,7 @@ class ICCloudImage(
         val instanceFolder: ManagedObjectReference,
         val maxInstances: Int,
         val networks: List<String>,
+        val agentPool: Int?,
         val profile: ICCloudClient) : CloudImage {
 
     private var instanceCounter = 0
@@ -60,6 +61,6 @@ class ICCloudImage(
     }
 
     override fun getAgentPoolId(): Int? {
-        return null
+        return agentPool
     }
 }

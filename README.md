@@ -33,6 +33,7 @@ Finally, provide one or more image configurations.
             "template": "datacenter/vm/tc-agent-template",
             "instanceFolder": "datacenter/vm/tc-agents",
             "maxInstances": 50,
+            "agentPool": "mypool",
             "network": "datacenter/network/agent-network"
         }
     }
@@ -46,6 +47,10 @@ be placed. This can be the same folder as your template.
 The name of the image is used as a base for the names of the cloned images.
 
 The plugin will not allow more than `maxInstances` instances to run simultaneously.
+
+If `agentPool` is unspecified, the image will be assigned to the default pool.
+You can set an explicit pool by specifying either the pool's name or its
+numeric identifier.
 
 Optionally, you can set the network to which the cloned machine's ethernet card should
 be connected. If your image contains multiple network cards, set this field to an
