@@ -4,6 +4,7 @@ import com.vmware.vim25.*
 import jetbrains.buildServer.clouds.*
 import jetbrains.buildServer.serverSide.AgentDescription
 import jetbrains.buildServer.serverSide.BuildAgentManager
+import jetbrains.buildServer.serverSide.agentPools.AgentPoolManager
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.*
@@ -13,12 +14,12 @@ private val terminalStates = arrayOf(InstanceStatus.ERROR, InstanceStatus.ERROR_
 class ICCloudClient(
         val vim: VimWrapper,
         val buildAgentManager: BuildAgentManager,
+        agentPoolManager: AgentPoolManager,
         val uuid: String,
         imageConfig: String) : CloudClientEx {
 
-    private fun createImage(id: String, name: String, template: ManagedObjectReference, folder: ManagedObjectReference, maxInstances: Int, networks: List<String>) {
-        val image = ICCloudImage(id, name, template, folder, maxInstances, networks, this)
-        val children = vim.getProperty(folder, "childEntity") as ArrayOfManagedObjectReference
+    private fun setupImage(image: ICCloudImage) {
+        val children = vim.getProperty(image.instanceFolder, "childEntity") as ArrayOfManagedObjectReference
 
         for (mof in children.managedObjectReference) {
             if (mof.type != "VirtualMachine")
@@ -43,7 +44,7 @@ class ICCloudClient(
                 instances[instance.uuid] = instance
             }
         }
-        images[id] = image
+        images[image.id] = image
     }
 
     @Throws(QuotaException::class)
@@ -140,7 +141,15 @@ class ICCloudClient(
                 else -> throw RuntimeException("Invalid network configuration")
             }
 
-            createImage(imageName, imageName, vm, folder, maxInstances, networks)
+            val agentPool = when (val value = image.opt("agentPool")) {
+                is String -> agentPoolManager.allAgentPools.firstOrNull { it.name == value }?.agentPoolId
+                is Int -> value
+                JSONObject.NULL, null -> null
+                else -> throw RuntimeException("Invalid agentPool, must be either pool name or id")
+            }
+
+            val imageObject = ICCloudImage(imageName, imageName, vm, folder, maxInstances, networks, agentPool, this)
+            setupImage(imageObject)
         }
     }
 }
