@@ -119,7 +119,6 @@ class ICCloudClient(
 
             val imageInstanceFolder = image.optString("instanceFolder") ?: imageTemplate.substring(0, sepIndex)
 
-            val imageId = imageTemplate.substring(sepIndex + 1)
             val vm = vim.authenticated {
                 port.findByInventoryPath(serviceContent.searchIndex, imageTemplate)
             }
@@ -141,7 +140,7 @@ class ICCloudClient(
                 else -> throw RuntimeException("Invalid network configuration")
             }
 
-            createImage(imageId, imageName, vm, folder, maxInstances, networks)
+            createImage(imageName, imageName, vm, folder, maxInstances, networks)
         }
     }
 }
