@@ -16,6 +16,7 @@ class ICCloudInstance(
         private val image: ICCloudImage) : CloudInstance {
 
     private var name: String = image.name
+    private val profile = image.profile
 
     override fun getInstanceId(): String {
         return uuid
@@ -81,11 +82,11 @@ class ICCloudInstance(
 
             put("guestinfo.teamcity-instance-startTime", startTime.time.toString())
             put("guestinfo.teamcity-instance-uuid", uuid)
-            put("guestinfo.teamcity-profile-uuid", image.profile.uuid)
+            put("guestinfo.teamcity-profile-uuid", profile.uuid)
             put("guestinfo.teamcity-instance-config", data.toString())
         }
 
-        val devices = image.profile.vim.getProperty(image.template, "config.hardware.device") as ArrayOfVirtualDevice
+        val devices = profile.vim.getProperty(image.template, "config.hardware.device") as ArrayOfVirtualDevice
         val ethernetDevices = devices.virtualDevice.filterIsInstance(VirtualEthernetCard::class.java)
 
         val cloneTask = vim.authenticated {
@@ -152,14 +153,14 @@ class ICCloudInstance(
 
         val agentId = matchedAgentId
         if (agentId != null) {
-            val agent = image.profile.buildAgentManager.findAgentById<SBuildAgent>(agentId, false)
+            val agent = profile.buildAgentManager.findAgentById<SBuildAgent>(agentId, false)
             agent?.apply {
                 setEnabled(false, null, "Agent is terminating")
                 setAuthorized(false, null, "Agent is terminating")
             }
         }
 
-        powerOffJob = GlobalScope.launch {
+        powerOffJob = GlobalScope.launch(profile.coroutineDispatcher) {
             try {
                 powerOnJob?.cancelAndJoin()
             } catch (e: Exception) {
@@ -169,6 +170,7 @@ class ICCloudInstance(
                 status = InstanceStatus.STOPPING
                 powerOff()
                 status = InstanceStatus.STOPPED
+                image.removeInstance(this@ICCloudInstance)
             } catch (e: Exception) {
                 errorInfo = CloudErrorInfo(e.message?: "", "", e)
                 status = InstanceStatus.ERROR_CANNOT_STOP
@@ -191,7 +193,7 @@ class ICCloudInstance(
 		fun createFresh(vim: VimWrapper, image: ICCloudImage, userData: CloudInstanceUserData): ICCloudInstance {
             return ICCloudInstance(vim, Date(), UUID.randomUUID().toString(), image).apply {
                 status = InstanceStatus.SCHEDULED_TO_START
-                powerOnJob = GlobalScope.launch {
+                powerOnJob = GlobalScope.launch(profile.coroutineDispatcher) {
                     try {
                         status = InstanceStatus.STARTING
                         while (vm == null) {

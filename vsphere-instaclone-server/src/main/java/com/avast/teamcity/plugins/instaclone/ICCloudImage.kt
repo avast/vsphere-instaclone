@@ -5,7 +5,7 @@ import jetbrains.buildServer.clouds.CloudErrorInfo
 import jetbrains.buildServer.clouds.CloudImage
 import jetbrains.buildServer.clouds.CloudInstance
 import jetbrains.buildServer.clouds.CloudInstanceUserData
-import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 class ICCloudImage(
         private val id: String,
@@ -14,11 +14,11 @@ class ICCloudImage(
         val instanceFolder: ManagedObjectReference,
         val maxInstances: Int,
         val networks: List<String>,
-        val agentPool: Int?,
+        private val agentPool: Int?,
         val profile: ICCloudClient) : CloudImage {
 
     private var instanceCounter = 0
-    private val instances = HashMap<String, ICCloudInstance>()
+    private val instances = ConcurrentHashMap<String, ICCloudInstance>()
 
     fun allocateName(): String {
         return "$name-${instanceCounter++}"
