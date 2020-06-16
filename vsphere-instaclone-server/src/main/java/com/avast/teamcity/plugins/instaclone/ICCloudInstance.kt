@@ -170,6 +170,7 @@ class ICCloudInstance(
                 status = InstanceStatus.STOPPING
                 powerOff()
                 status = InstanceStatus.STOPPED
+                image.removeInstance(this@ICCloudInstance)
             } catch (e: Exception) {
                 errorInfo = CloudErrorInfo(e.message?: "", "", e)
                 status = InstanceStatus.ERROR_CANNOT_STOP
