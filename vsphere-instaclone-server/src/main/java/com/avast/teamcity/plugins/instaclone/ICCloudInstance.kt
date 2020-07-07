@@ -3,7 +3,7 @@ package com.avast.teamcity.plugins.instaclone
 import com.vmware.vim25.*
 import jetbrains.buildServer.clouds.*
 import jetbrains.buildServer.serverSide.AgentDescription
-import jetbrains.buildServer.serverSide.SBuildAgent
+import jetbrains.buildServer.serverSide.BuildAgentEx
 import kotlinx.coroutines.*
 import org.json.JSONObject
 import java.lang.RuntimeException
@@ -151,23 +151,49 @@ class ICCloudInstance(
 
         status = InstanceStatus.SCHEDULED_TO_STOP
 
-        val agentId = matchedAgentId
-        if (agentId != null) {
-            val agent = profile.buildAgentManager.findAgentById<SBuildAgent>(agentId, false)
-            agent?.apply {
-                setEnabled(false, null, "Agent is terminating")
-                setAuthorized(false, null, "Agent is terminating")
-            }
+        val agent = matchedAgentId?.let {
+            profile.buildAgentManager.findAgentById<BuildAgentEx>(it, false)
         }
+        agent?.setEnabled(false, null, "Cloud agent is terminating")
 
-        powerOffJob = GlobalScope.launch(profile.coroutineDispatcher) {
+        powerOffJob = profile.coroScope.launch {
             try {
                 powerOnJob?.cancelAndJoin()
             } catch (e: Exception) {
             }
 
+            status = InstanceStatus.STOPPING
+
             try {
-                status = InstanceStatus.STOPPING
+                val vm = this@ICCloudInstance.vm!!
+                try {
+                    val remoteInterface = agent?.getRemoteInterface(AgentService::class.java)
+                    if (remoteInterface != null) {
+                        remoteInterface.shutdown()
+                    } else {
+                        vim.authenticated {
+                            vim.port.shutdownGuest(vm)
+                        }
+                    }
+
+                    val deadline = System.nanoTime() + image.shutdownTimeout.toNanos()
+                    while (System.nanoTime() < deadline) {
+                        delay(1000)
+
+                        try {
+                            val shutdown = vim.getProperty(vm, "config.extraConfig[\"guestinfo.teamcity-instance-shutdown\"].value") as String
+                            if (shutdown.isNotEmpty())
+                                break
+                        } catch (_: Exception) {
+                        }
+
+                        val state = vim.getProperty(vm, "runtime.powerState") as VirtualMachinePowerState
+                        if (state != VirtualMachinePowerState.POWERED_ON)
+                            break
+                    }
+                } catch (_: Exception) {
+                }
+
                 powerOff()
                 status = InstanceStatus.STOPPED
                 image.removeInstance(this@ICCloudInstance)
@@ -193,7 +219,7 @@ class ICCloudInstance(
 		fun createFresh(vim: VimWrapper, image: ICCloudImage, userData: CloudInstanceUserData): ICCloudInstance {
             return ICCloudInstance(vim, Date(), UUID.randomUUID().toString(), image).apply {
                 status = InstanceStatus.SCHEDULED_TO_START
-                powerOnJob = GlobalScope.launch(profile.coroutineDispatcher) {
+                powerOnJob = profile.coroScope.launch {
                     try {
                         status = InstanceStatus.STARTING
                         while (vm == null) {
@@ -217,9 +243,8 @@ class ICCloudInstance(
         }
 
         fun createRunning(vim: VimWrapper, uuid: String, name: String, image: ICCloudImage, vm: ManagedObjectReference): ICCloudInstance {
-            val startTime = vim.authenticated {
+            val startTime =
                 vim.getProperty(vm, "config.extraConfig[\"guestinfo.teamcity-instance-startTime\"].value") as String
-            }
 
             return ICCloudInstance(vim, Date(startTime.toLong()), uuid, image).apply {
                 status = InstanceStatus.RUNNING

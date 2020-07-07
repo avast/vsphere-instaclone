@@ -5,12 +5,13 @@ import jetbrains.buildServer.clouds.*
 import jetbrains.buildServer.serverSide.AgentDescription
 import jetbrains.buildServer.serverSide.BuildAgentManager
 import jetbrains.buildServer.serverSide.agentPools.AgentPoolManager
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.Duration
 import java.util.*
 import java.util.concurrent.Executors
-import kotlin.coroutines.CoroutineContext
 
 private val terminalStates = arrayOf(InstanceStatus.ERROR, InstanceStatus.ERROR_CANNOT_STOP, InstanceStatus.STOPPED)
 
@@ -21,7 +22,7 @@ class ICCloudClient(
         val uuid: String,
         imageConfig: String) : CloudClientEx {
 
-    val coroutineDispatcher: CoroutineContext = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+    val coroScope = CoroutineScope(Executors.newSingleThreadExecutor().asCoroutineDispatcher())
 
     private fun setupImage(image: ICCloudImage) {
         val children = vim.getProperty(image.instanceFolder, "childEntity") as ArrayOfManagedObjectReference
@@ -153,7 +154,11 @@ class ICCloudClient(
                 else -> throw RuntimeException("Invalid agentPool, must be either pool name or id")
             }
 
-            val imageObject = ICCloudImage(imageName, imageName, vm, folder, maxInstances, networks, agentPool, this)
+            val shutdownTimeout
+                    = Duration.ofSeconds(image.optInt("shutdownTimeout", 30).toLong())
+
+            val imageObject = ICCloudImage(imageName, imageName, vm, folder, maxInstances,
+                    networks, shutdownTimeout, agentPool, this)
             setupImage(imageObject)
         }
     }
