@@ -5,6 +5,7 @@ import jetbrains.buildServer.clouds.CloudErrorInfo
 import jetbrains.buildServer.clouds.CloudImage
 import jetbrains.buildServer.clouds.CloudInstance
 import jetbrains.buildServer.clouds.CloudInstanceUserData
+import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
 class ICCloudImage(
@@ -14,6 +15,7 @@ class ICCloudImage(
         val instanceFolder: ManagedObjectReference,
         val maxInstances: Int,
         val networks: List<String>,
+        val shutdownTimeout: Duration,
         private val agentPool: Int?,
         val profile: ICCloudClient) : CloudImage {
 

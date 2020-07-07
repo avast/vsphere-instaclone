@@ -65,6 +65,7 @@ array of network names.
 5. Once ready, modify the agent's `build.properties` file by
    * deleting the authentication token (this ensures that each clone gets a new one) and by
    * setting `vmware.freeze.script` to a path to your freeze script (see below).
+   * Optionally, set `vmware.shutdown.script`.
 6. Wait a little. The agent will pick up the changes and restart. Just before registering
    to your TeamCity server, the agent will execute the freeze script, which should freeze your VM.
    Once cloned, the freeze script continues executing on the new machine.
@@ -78,7 +79,7 @@ to the path to the `rpctool` executable.
 
 Setting `vmware.freeze.script` will cause the agent to execute it during the next agent startup.
 
-## The Freeze Script
+## Freeze Script
 
 The simplest freeze script only performs the freeze, but you probably also want
 to restart networking, so as to have new clones pick up a new IP address.
@@ -90,3 +91,8 @@ On Windows, the script might be a .bat file and look like this.
 
 Adjust for other systems and your requirements.
 
+## Shutdown Script
+
+If set, the shutdown script is run after the agent has unregistered
+from the server, but before the machine is deleted.
+This is an ideal place to release the machine's IP address, for example.
