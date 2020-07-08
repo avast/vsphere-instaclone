@@ -6,7 +6,6 @@ import jetbrains.buildServer.serverSide.AgentDescription
 import jetbrains.buildServer.serverSide.BuildAgentEx
 import kotlinx.coroutines.*
 import org.json.JSONObject
-import java.lang.RuntimeException
 import java.util.*
 
 class ICCloudInstance(
@@ -99,13 +98,24 @@ class ICCloudInstance(
                         val netMor = vim.authenticated {
                             vim.port.findByInventoryPath(vim.serviceContent.searchIndex, networkName)
                         }
-
                         val netName = networkName.substringAfterLast('/')
 
-                        ethernetDevice.backing = VirtualEthernetCardNetworkBackingInfo().apply {
-                            this.network = netMor
-                            deviceName = netName
-                            isUseAutoDetect = true
+                        ethernetDevice.backing = when (netMor.type) {
+                            "Network" -> VirtualEthernetCardNetworkBackingInfo().apply {
+                                this.network = netMor
+                                deviceName = netName
+                                isUseAutoDetect = true
+                            }
+
+                            "DistributedVirtualPortgroup" -> VirtualEthernetCardDistributedVirtualPortBackingInfo().apply {
+                                port = DistributedVirtualSwitchPortConnection().apply {
+                                    portgroupKey = vim.getProperty(netMor, "key") as String
+                                    val switchMor = vim.getProperty(netMor, "config.distributedVirtualSwitch") as ManagedObjectReference
+                                    switchUuid = vim.getProperty(switchMor, "uuid") as String
+                                }
+                            }
+
+                            else -> throw RuntimeException("Can't connect a ${netMor.type} to a network adapter")
                         }
 
                         deviceChange.add(VirtualDeviceConfigSpec().apply {
