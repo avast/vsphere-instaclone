@@ -14,8 +14,8 @@ import java.util.*
 import javax.xml.ws.BindingProvider
 
 class ICCloudClientFactory(
+        private val pluginClassLoader: ClassLoader,
         private val pluginDescriptor: PluginDescriptor,
-        cloudRegistrar: CloudRegistrar,
         cloudEventDispatcher: CloudEventDispatcher,
         private val agentPoolManager: AgentPoolManager,
         private val buildAgentManager: BuildAgentManager) : CloudClientFactory {
@@ -28,7 +28,20 @@ class ICCloudClientFactory(
         throw RuntimeException("Failed to get resource content", e)
     }
 
-    private val vimService = VimService()
+    private fun<T> withPluginClassLoader(block: () -> T): T {
+        val currentThread = Thread.currentThread()
+        val prevClassLoader = currentThread.contextClassLoader
+        currentThread.contextClassLoader = pluginClassLoader
+        try {
+            return block()
+        } finally {
+            currentThread.contextClassLoader = prevClassLoader
+        }
+    }
+
+    private val vimService = withPluginClassLoader {
+        VimService()
+    }
 
     init {
         cloudEventDispatcher.addListener(object : CloudEventAdapter() {
@@ -42,10 +55,7 @@ class ICCloudClientFactory(
             }
         })
 
-        cloudRegistrar.registerCloudFactory(this)
     }
-
-
 
     private fun getVimPort(sdkUrl: String?): VimPortType {
         val port = vimService.vimPort
@@ -57,14 +67,16 @@ class ICCloudClientFactory(
 
     override fun createNewClient(cloudState: CloudState,
                                  cloudClientParameters: CloudClientParameters): CloudClientEx {
-        val profileUuid = cloudClientParameters.getParameter("vmwareInstacloneProfileUuid")!!
-        val sdkUrl = cloudClientParameters.getParameter("vmwareInstacloneSdkUrl")
-        val port = getVimPort(sdkUrl)
-        val username = cloudClientParameters.getParameter("vmwareInstacloneUsername")!!
-        val password = cloudClientParameters.getParameter("vmwareInstaclonePassword")!!
-        val imageConfig = cloudClientParameters.getParameter("vmwareInstacloneImages")!!
-        val vim = VimWrapper(port, username, password)
-        return ICCloudClient(vim, buildAgentManager, agentPoolManager, profileUuid, imageConfig)
+        return withPluginClassLoader {
+            val profileUuid = cloudClientParameters.getParameter("vmwareInstacloneProfileUuid")!!
+            val sdkUrl = cloudClientParameters.getParameter("vmwareInstacloneSdkUrl")
+            val port = getVimPort(sdkUrl)
+            val username = cloudClientParameters.getParameter("vmwareInstacloneUsername")!!
+            val password = cloudClientParameters.getParameter("vmwareInstaclonePassword")!!
+            val imageConfig = cloudClientParameters.getParameter("vmwareInstacloneImages")!!
+            val vim = VimWrapper(port, username, password)
+            ICCloudClient(vim, buildAgentManager, agentPoolManager, profileUuid, imageConfig)
+        }
     }
 
     override fun getCloudCode(): String {
@@ -94,5 +106,4 @@ class ICCloudClientFactory(
         val config = agentDescription.configurationParameters
         return config.containsKey("vsphere-instaclone.instance.uuid")
     }
-
 }
