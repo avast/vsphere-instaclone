@@ -25,7 +25,6 @@
 
     <modules>
         <module>teamcity-stubs</module>
-        <module>vsphere-instaclone-common</module>
         <module>vsphere-instaclone-agent</module>
         <module>vsphere-instaclone-server</module>
         <module>build</module>

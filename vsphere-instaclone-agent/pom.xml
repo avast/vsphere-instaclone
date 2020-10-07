@@ -20,12 +20,6 @@
 
         <dependency>
             <groupId>com.avast.teamcity.plugins</groupId>
-            <artifactId>vsphere-instaclone-common</artifactId>
-            <version>1.0-SNAPSHOT</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.avast.teamcity.plugins</groupId>
             <artifactId>teamcity-stubs</artifactId>
             <version>1.0-SNAPSHOT</version>
             <scope>provided</scope>

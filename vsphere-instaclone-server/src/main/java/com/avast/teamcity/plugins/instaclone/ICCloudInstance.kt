@@ -88,7 +88,7 @@ class ICCloudInstance(
         val devices = profile.vim.getProperty(image.template, "config.hardware.device") as ArrayOfVirtualDevice
         val ethernetDevices = devices.virtualDevice.filterIsInstance(VirtualEthernetCard::class.java)
 
-        val cloneTask = vim.authenticated {
+        val cloneTask = vim.authenticated { port ->
             port.instantCloneTask(image.template, VirtualMachineInstantCloneSpec().apply {
                 this.name = name
                 this.location = VirtualMachineRelocateSpec().apply {
@@ -96,7 +96,7 @@ class ICCloudInstance(
 
                     for ((networkName, ethernetDevice) in image.networks.zip(ethernetDevices)) {
                         val netMor = vim.authenticated {
-                            vim.port.findByInventoryPath(vim.serviceContent.searchIndex, networkName)
+                            it.findByInventoryPath(vim.serviceContent.searchIndex, networkName)
                         }
                         val netName = networkName.substringAfterLast('/')
 
@@ -108,7 +108,7 @@ class ICCloudInstance(
                             }
 
                             "DistributedVirtualPortgroup" -> VirtualEthernetCardDistributedVirtualPortBackingInfo().apply {
-                                port = DistributedVirtualSwitchPortConnection().apply {
+                                this.port = DistributedVirtualSwitchPortConnection().apply {
                                     portgroupKey = vim.getProperty(netMor, "key") as String
                                     val switchMor = vim.getProperty(netMor, "config.distributedVirtualSwitch") as ManagedObjectReference
                                     switchUuid = vim.getProperty(switchMor, "uuid") as String
@@ -142,7 +142,7 @@ class ICCloudInstance(
             return
 
         val powerOffTask = vim.authenticated {
-            port.powerOffVMTask(vm)
+            it.powerOffVMTask(vm)
         }
         try {
             waitForTask(powerOffTask)
@@ -150,9 +150,17 @@ class ICCloudInstance(
         }
 
         val destroyTask = vim.authenticated {
-            port.destroyTask(vm)
+            it.destroyTask(vm)
         }
         waitForTask(destroyTask)
+    }
+
+    private fun getVmInstanceState(vm: ManagedObjectReference): String {
+        return try {
+            vim.getProperty(vm, "config.extraConfig[\"guestinfo.teamcity-instance-state\"].value") as String
+        } catch (_: Exception) {
+            ""
+        }
     }
 
     fun terminate() {
@@ -177,29 +185,33 @@ class ICCloudInstance(
             try {
                 val vm = this@ICCloudInstance.vm!!
                 try {
-                    val remoteInterface = agent?.getRemoteInterface(AgentService::class.java)
-                    if (remoteInterface != null) {
-                        remoteInterface.shutdown()
-                    } else {
-                        vim.authenticated {
-                            vim.port.shutdownGuest(vm)
+                    val task = vim.authenticated {
+                        it.reconfigVMTask(vm, VirtualMachineConfigSpec().apply {
+                            extraConfig.add(OptionValue().apply {
+                                key = "guestinfo.teamcity-instance-control"
+                                value = "shutdown"
+                            })
+                        })
+                    }
+                    waitForTask(task)
+
+                    var instanceState = getVmInstanceState(vm)
+                    if (instanceState != "ready" && instanceState != "shutdown") {
+                        try {
+                            vim.authenticated { it.shutdownGuest(vm) }
+                        } catch (_: Exception) {
                         }
                     }
 
                     val deadline = System.nanoTime() + image.shutdownTimeout.toNanos()
-                    while (System.nanoTime() < deadline) {
+                    while (instanceState != "shutdown" && System.nanoTime() < deadline) {
+                        val powerState = vim.getProperty(vm, "runtime.powerState") as VirtualMachinePowerState
+                        if (powerState != VirtualMachinePowerState.POWERED_ON)
+                            break
+
                         delay(1000)
 
-                        try {
-                            val shutdown = vim.getProperty(vm, "config.extraConfig[\"guestinfo.teamcity-instance-shutdown\"].value") as String
-                            if (shutdown.isNotEmpty())
-                                break
-                        } catch (_: Exception) {
-                        }
-
-                        val state = vim.getProperty(vm, "runtime.powerState") as VirtualMachinePowerState
-                        if (state != VirtualMachinePowerState.POWERED_ON)
-                            break
+                        instanceState = getVmInstanceState(vm)
                     }
                 } catch (_: Exception) {
                 }

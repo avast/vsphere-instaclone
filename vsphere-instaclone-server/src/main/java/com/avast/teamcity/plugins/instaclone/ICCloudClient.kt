@@ -127,13 +127,13 @@ class ICCloudClient(
             val imageInstanceFolder = image.optString("instanceFolder") ?: imageTemplate.substring(0, sepIndex)
 
             val vm = vim.authenticated {
-                port.findByInventoryPath(serviceContent.searchIndex, imageTemplate)
+                it.findByInventoryPath(vim.serviceContent.searchIndex, imageTemplate)
             }
             if (vm == null || vm.type != "VirtualMachine")
                 throw RuntimeException("Not a VM: $imageTemplate")
 
             val folder = vim.authenticated {
-                port.findByInventoryPath(serviceContent.searchIndex, imageInstanceFolder)
+                it.findByInventoryPath(vim.serviceContent.searchIndex, imageInstanceFolder)
             }
             if (folder == null || folder.type != "Folder")
                 throw RuntimeException("Not a folder: $imageInstanceFolder")

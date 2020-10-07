@@ -13,6 +13,17 @@ import java.io.IOException
 import java.util.*
 import javax.xml.ws.BindingProvider
 
+fun<T> ClassLoader.inContext(block: () -> T): T {
+    val currentThread = Thread.currentThread()
+    val prevClassLoader = currentThread.contextClassLoader
+    currentThread.contextClassLoader = this
+    try {
+        return block()
+    } finally {
+        currentThread.contextClassLoader = prevClassLoader
+    }
+}
+
 class ICCloudClientFactory(
         private val pluginClassLoader: ClassLoader,
         private val pluginDescriptor: PluginDescriptor,
@@ -28,18 +39,7 @@ class ICCloudClientFactory(
         throw RuntimeException("Failed to get resource content", e)
     }
 
-    private fun<T> withPluginClassLoader(block: () -> T): T {
-        val currentThread = Thread.currentThread()
-        val prevClassLoader = currentThread.contextClassLoader
-        currentThread.contextClassLoader = pluginClassLoader
-        try {
-            return block()
-        } finally {
-            currentThread.contextClassLoader = prevClassLoader
-        }
-    }
-
-    private val vimService = withPluginClassLoader {
+    private val vimService = pluginClassLoader.inContext {
         VimService()
     }
 
@@ -67,14 +67,14 @@ class ICCloudClientFactory(
 
     override fun createNewClient(cloudState: CloudState,
                                  cloudClientParameters: CloudClientParameters): CloudClientEx {
-        return withPluginClassLoader {
+        return pluginClassLoader.inContext {
             val profileUuid = cloudClientParameters.getParameter("vmwareInstacloneProfileUuid")!!
             val sdkUrl = cloudClientParameters.getParameter("vmwareInstacloneSdkUrl")
             val port = getVimPort(sdkUrl)
             val username = cloudClientParameters.getParameter("vmwareInstacloneUsername")!!
             val password = cloudClientParameters.getParameter("vmwareInstaclonePassword")!!
             val imageConfig = cloudClientParameters.getParameter("vmwareInstacloneImages")!!
-            val vim = VimWrapper(port, username, password)
+            val vim = VimWrapper(port, username, password, pluginClassLoader)
             ICCloudClient(vim, buildAgentManager, agentPoolManager, profileUuid, imageConfig)
         }
     }

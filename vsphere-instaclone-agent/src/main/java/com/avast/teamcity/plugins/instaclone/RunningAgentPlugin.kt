@@ -9,7 +9,7 @@ import org.json.JSONObject
 import java.io.File
 import java.time.Duration
 
-class RunningAgentPlugin(val agent: BuildAgent) : AgentService {
+class RunningAgentPlugin(private val agent: BuildAgent) {
 
     private val config = agent.configuration as BuildAgentConfigurationEx
     private val rpcToolPath = findRpcTool(config)
@@ -65,6 +65,34 @@ class RunningAgentPlugin(val agent: BuildAgent) : AgentService {
         if (agentName != null) {
             config.name = agentName
         }
+
+        listenForShutdown()
+    }
+
+    private fun listenForShutdown() {
+        val shutdownScript = config.configurationParameters["vmware.shutdown.script"]
+        Thread {
+            callRpcTool("info-set guestinfo.teamcity-instance-state ready")
+
+            while (callRpcTool("info-get guestinfo.teamcity-instance-control") != "shutdown") {
+                Thread.sleep(1000)
+            }
+
+            LOG.info("Received shutdown signal due to instance being terminated")
+            val agent = this.agent as BuildAgentEx
+            agent.serverMonitor.shutdown()
+            agent.unregisterFromBuildServer()
+            if (shutdownScript != null) {
+                LOG.info(String.format("Going to execute the shutdown script: %s", shutdownScript))
+                try {
+                    exec(shutdownScript).waitFor()
+                } catch (_: Exception) {
+                }
+            }
+
+            LOG.info("Signalling shutdown completion")
+            callRpcTool("info-set guestinfo.teamcity-instance-state shutdown")
+        }.start()
     }
 
     companion object {
@@ -90,26 +118,6 @@ class RunningAgentPlugin(val agent: BuildAgent) : AgentService {
                 "/usr/bin/vmware-rpctool",
                 "/sbin/rpctool",
                 "/Library/Application Support/VMware Tools/vmware-tools-daemon")
-    }
-
-    override fun shutdown() {
-        val shutdownScript = config.configurationParameters["vmware.shutdown.script"]
-        Thread {
-            LOG.info("Received shutdown signal due to instance being terminated")
-            val agent = this.agent as BuildAgentEx
-            agent.serverMonitor.shutdown()
-            agent.unregisterFromBuildServer()
-            if (shutdownScript != null) {
-                LOG.info(String.format("Going to execute the shutdown script: %s", shutdownScript))
-                try {
-                    exec(shutdownScript).waitFor()
-                } catch (_: Exception) {
-                }
-            }
-
-            LOG.info("Signalling shutdown completion")
-            callRpcTool("info-set guestinfo.teamcity-instance-shutdown true")
-        }.start()
     }
 
     private fun callRpcTool(command: String): String? {

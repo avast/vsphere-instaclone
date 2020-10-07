@@ -6,9 +6,10 @@ import javax.xml.soap.DetailEntry
 import javax.xml.ws.soap.SOAPFaultException
 
 class VimWrapper(
-        val port: VimPortType,
+        private val port: VimPortType,
         private val username: String,
-        private val password: String) {
+        private val password: String,
+        private val pluginClassLoader: ClassLoader) {
 
     val serviceContent: ServiceContent = port.retrieveServiceContent(serviceInstance)
 
@@ -28,10 +29,16 @@ class VimWrapper(
         sessionId = port.login(serviceContent.sessionManager, username, password, null).key
     }
 
-    fun<T> authenticated(block: VimWrapper.() -> T): T {
+    fun<T> unauthenticated(block: (port: VimPortType) -> T): T {
+        return pluginClassLoader.inContext {
+            block(port)
+        }
+    }
+
+    fun<T> authenticated(block: (port: VimPortType) -> T): T {
         rep@ while (true) {
             try {
-                return this.block()
+                return unauthenticated(block)
             } catch (e: SOAPFaultException) {
                 for (it in e.fault.detail.detailEntries) {
                     val entry = it as DetailEntry
