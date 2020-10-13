@@ -16,17 +16,19 @@ class VimWrapper(
     private var sessionId: String = ""
 
     private fun doLogin(faultMessage: String) {
-        val sessionActive = sessionId != "" && try {
-            port.sessionIsActive(serviceContent.sessionManager, sessionId, username)
-        } catch(e: Exception) {
-            false
-        }
+        pluginClassLoader.inContext {
+            val sessionActive = sessionId != "" && try {
+                port.sessionIsActive(serviceContent.sessionManager, sessionId, username)
+            } catch (e: Exception) {
+                false
+            }
 
-        if (sessionActive) {
-            throw RuntimeException(faultMessage)
-        }
+            if (sessionActive) {
+                throw RuntimeException(faultMessage)
+            }
 
-        sessionId = port.login(serviceContent.sessionManager, username, password, null).key
+            sessionId = port.login(serviceContent.sessionManager, username, password, null).key
+        }
     }
 
     fun<T> unauthenticated(block: (port: VimPortType) -> T): T {
