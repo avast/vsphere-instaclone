@@ -54,7 +54,7 @@ class VimWrapper(
         }
     }
 
-    fun getProperty(obj: ManagedObjectReference, name: String): Any {
+    fun getProperty(obj: ManagedObjectReference, name: String): Any? {
         val filterSpec = PropertyFilterSpec()
         val objectSpec = ObjectSpec().also {
             it.obj = obj
@@ -75,6 +75,8 @@ class VimWrapper(
 
             val content = retrieveResult.objects[0]
             if (content.missingSet.isEmpty()) {
+                if (content.propSet.size < 1)
+                    return null
                 assert(content.propSet.size == 1)
                 return content.propSet[0].getVal()
             }

@@ -25,7 +25,8 @@ class ICCloudClient(
     val coroScope = CoroutineScope(Executors.newSingleThreadExecutor().asCoroutineDispatcher())
 
     private fun setupImage(image: ICCloudImage) {
-        val children = vim.getProperty(image.instanceFolder, "childEntity") as ArrayOfManagedObjectReference
+        val children = vim.getProperty(image.instanceFolder, "childEntity") as ArrayOfManagedObjectReference?
+            ?: return
 
         for (mof in children.managedObjectReference) {
             if (mof.type != "VirtualMachine")
@@ -33,7 +34,8 @@ class ICCloudClient(
 
             var instanceUuid: String? = null
             var isOurInstance = false
-            val extraConfig = vim.getProperty(mof, "config.extraConfig") as ArrayOfOptionValue
+            val extraConfig = vim.getProperty(mof, "config.extraConfig") as ArrayOfOptionValue?
+                ?: continue
 
             for (optionValue in extraConfig.optionValue) {
                 if (optionValue.key == "guestinfo.teamcity-instance-uuid") {

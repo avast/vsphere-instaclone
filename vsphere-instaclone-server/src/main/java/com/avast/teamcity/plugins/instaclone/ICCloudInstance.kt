@@ -85,7 +85,8 @@ class ICCloudInstance(
             put("guestinfo.teamcity-instance-config", data.toString())
         }
 
-        val devices = profile.vim.getProperty(image.template, "config.hardware.device") as ArrayOfVirtualDevice
+        val devices = profile.vim.getProperty(image.template, "config.hardware.device") as ArrayOfVirtualDevice?
+            ?: throw RuntimeException("Can't list VM hardware for the template for $name")
         val ethernetDevices = devices.virtualDevice.filterIsInstance(VirtualEthernetCard::class.java)
 
         val cloneTask = vim.authenticated { port ->
@@ -156,11 +157,8 @@ class ICCloudInstance(
     }
 
     private fun getVmInstanceState(vm: ManagedObjectReference): String {
-        return try {
-            vim.getProperty(vm, "config.extraConfig[\"guestinfo.teamcity-instance-state\"].value") as String
-        } catch (_: Exception) {
-            ""
-        }
+        return vim.getProperty(vm, "config.extraConfig[\"guestinfo.teamcity-instance-state\"].value") as String?
+            ?: ""
     }
 
     fun terminate() {
@@ -265,10 +263,11 @@ class ICCloudInstance(
         }
 
         fun createRunning(vim: VimWrapper, uuid: String, name: String, image: ICCloudImage, vm: ManagedObjectReference): ICCloudInstance {
-            val startTime =
-                vim.getProperty(vm, "config.extraConfig[\"guestinfo.teamcity-instance-startTime\"].value") as String
+            val startTimeStr =
+                vim.getProperty(vm, "config.extraConfig[\"guestinfo.teamcity-instance-startTime\"].value") as String?
+            val startTime = Date(startTimeStr?.toLong() ?: System.currentTimeMillis())
 
-            return ICCloudInstance(vim, Date(startTime.toLong()), uuid, image).apply {
+            return ICCloudInstance(vim, startTime, uuid, image).apply {
                 status = InstanceStatus.RUNNING
                 this.name = name
                 this.vm = vm
