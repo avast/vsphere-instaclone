@@ -16,6 +16,7 @@ class ICCloudImage(
         val maxInstances: Int,
         val networks: List<String>,
         val shutdownTimeout: Duration,
+        val suspendOnly: Boolean,
         private val agentPool: Int?,
         val profile: ICCloudClient) : CloudImage {
 

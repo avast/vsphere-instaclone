@@ -159,8 +159,10 @@ class ICCloudClient(
             val shutdownTimeout
                     = Duration.ofSeconds(image.optInt("shutdownTimeout", 30).toLong())
 
+            val suspendOnly = image.optBoolean("suspendOnly", false)
+
             val imageObject = ICCloudImage(imageName, imageName, vm, folder, maxInstances,
-                    networks, shutdownTimeout, agentPool, this)
+                    networks, shutdownTimeout, suspendOnly, agentPool, this)
             setupImage(imageObject)
         }
     }

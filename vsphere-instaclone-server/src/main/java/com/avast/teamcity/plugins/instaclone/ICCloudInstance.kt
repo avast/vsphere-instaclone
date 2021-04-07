@@ -138,6 +138,19 @@ class ICCloudInstance(
         return waitForTask(cloneTask) as ManagedObjectReference
     }
 
+    private suspend fun suspendVm() {
+        if (vm == null)
+            return
+
+        try {
+            val suspendTask = vim.authenticated {
+                it.suspendVMTask(vm)
+            }
+            waitForTask(suspendTask)
+        } catch (e: Exception) {
+        }
+    }
+
     private suspend fun powerOff() {
         if (vm == null)
             return
@@ -214,7 +227,10 @@ class ICCloudInstance(
                 } catch (_: Exception) {
                 }
 
-                powerOff()
+                if (image.suspendOnly)
+                    suspendVm()
+                else
+                    powerOff()
                 status = InstanceStatus.STOPPED
                 image.removeInstance(this@ICCloudInstance)
             } catch (e: Exception) {
