@@ -5,4 +5,7 @@
        default-autowire="constructor">
   <bean class="com.avast.teamcity.plugins.instaclone.ICPlugin"/>
   <bean class="com.avast.teamcity.plugins.instaclone.web.ICCloudProfileSettings"/>
+  <bean class="com.avast.teamcity.plugins.instaclone.web.ICCloudProfileUIManager"/>
+  <bean class="com.avast.teamcity.plugins.instaclone.web.service.CloudProfilesService"/>
+  <bean class="com.avast.teamcity.plugins.instaclone.web.ICProfileController"/>
 </beans>

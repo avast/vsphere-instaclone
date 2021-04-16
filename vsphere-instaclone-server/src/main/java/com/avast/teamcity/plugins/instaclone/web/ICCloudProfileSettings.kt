@@ -18,7 +18,7 @@ class ICCloudProfileSettings(
     }
 
     @Throws(Exception::class)
-    override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView? {
+    override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView {
         val path = pluginDescriptor.getPluginResourcesPath("cloud-profile-settings.jsp")
         return ModelAndView(path)
     }

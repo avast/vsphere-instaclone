@@ -5,37 +5,62 @@
 <%@ taglib prefix="bs" tagdir="/WEB-INF/tags" %>
 <%@ taglib prefix="forms" tagdir="/WEB-INF/tags/forms" %>
 
-<tr>
-    <th>
-        <label for="vmwareInstacloneSdkUrl">vCenter SDK URL:</label><l:star/>
-    </th>
-    <td>
-        <props:textProperty name="vmwareInstacloneSdkUrl" className="longField" />
-    </td>
-</tr>
-<tr>
-    <th>
-        <label for="vmwareInstacloneUsername">Username:</label><l:star/>
-    </th>
-    <td>
-        <props:textProperty name="vmwareInstacloneUsername" className="longField" />
-    </td>
-</tr>
-<tr>
-    <th>
-        <label for="vmwareInstaclonePassword">Password:</label><l:star/>
-    </th>
-    <td>
-        <props:passwordProperty name="vmwareInstaclonePassword" className="longField" />
-    </td>
-</tr>
-<tr>
-    <th>
-        <label for="vmwareInstacloneImages">Images:</label><l:star/>
-    </th>
-    <td>
-        <props:multilineProperty name="vmwareInstacloneImages" linkTitle="" cols="120" rows="25" />
-    </td>
-</tr>
+<l:settingsGroup title="VMWare Instaclone profile settings">
+    <tr>
+        <th>
+            <label for="vmwareInstacloneSdkUrl">vCenter SDK URL:</label><l:star/>
+        </th>
+        <td>
 
-<props:hiddenProperty name="vmwareInstacloneProfileUuid" />
+            <props:textProperty name="vmwareInstacloneSdkUrl" className="longField"/>
+            <span class="error" id="error_vmwareInstacloneSdkUrl"></span>
+            <span class="error" id="error_vmwareInstacloneConnectionInfo"></span>
+        </td>
+    </tr>
+    <tr>
+        <th>
+            <label for="vmwareInstacloneUsername">Username:</label><l:star/>
+        </th>
+        <td>
+            <props:textProperty name="vmwareInstacloneUsername" className="longField"/>
+            <span class="error" id="error_vmwareInstacloneUsername"></span>
+        </td>
+    </tr>
+    <tr>
+        <th>
+            <label for="vmwareInstaclonePassword">Password:</label><l:star/>
+        </th>
+        <td>
+            <props:passwordProperty name="vmwareInstaclonePassword" className="longField"/>
+            <span class="error" id="error_vmwareInstaclonePassword"></span>
+        </td>
+    </tr>
+    <tr>
+        <th>
+            <label for="vmwareInstacloneImages">Images:</label><l:star/>
+        </th>
+        <td>
+            <props:multilineProperty name="vmwareInstacloneImages" linkTitle="" cols="120" rows="25"/>
+            <span class="error" id="error_vmwareInstacloneImages"></span>
+            <span class="smallNote">
+For each image, <code>template</code> specifies the path to the virtual machine to clone.
+On vSphere, this path always starts with the name of the datacenter, followed by "vm".
+<br/>
+The key <code>instanceFolder</code> specifies the vSphere folder in which cloned machines should
+be placed. This can be the folder your template resides in.
+The name of the image is used as a base for the names of the cloned images.
+<br/>
+The plugin will not allow more than <code>maxInstances</code> instances to run simultaneously.
+<br/>
+If <code>agentPool</code> is unspecified, the image will be assigned to the default pool.
+You can set an explicit pool by specifying either the pool's name or its
+numeric identifier.
+<br/>
+Optionally, you can set the network to which the cloned machine's ethernet card should
+be connected. If your image contains multiple network cards, set this field to an
+array of network names.
+    </span>
+        </td>
+    </tr>
+    <props:hiddenProperty name="vmwareInstacloneProfileUuid"/>
+</l:settingsGroup>

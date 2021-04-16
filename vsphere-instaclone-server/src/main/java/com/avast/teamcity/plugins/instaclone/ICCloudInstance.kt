@@ -65,7 +65,7 @@ class ICCloudInstance(
     }
 
     private suspend fun powerOn(name: String, userData: CloudInstanceUserData): ManagedObjectReference {
-        val extraConfig = HashMap<String, String>().apply {
+        val extraConfig = mutableMapOf<String, String>().apply {
             val data = JSONObject().apply {
                 val agentName = userData.agentName
                 put("agentName", if (agentName.isEmpty()) name else agentName)
@@ -94,7 +94,13 @@ class ICCloudInstance(
                 this.location = VirtualMachineRelocateSpec().apply {
                     folder = image.instanceFolder
 
+                    if (image.resourcePool != null) {
+                        pool = image.resourcePool
+                    }
+
+                    // network to which the cloned machine's ethernet card should be connected
                     for ((networkName, ethernetDevice) in image.networks.zip(ethernetDevices)) {
+
                         val netMor = vim.authenticated {
                             it.findByInventoryPath(vim.serviceContent.searchIndex, networkName)
                         }
@@ -226,6 +232,10 @@ class ICCloudInstance(
         }
     }
 
+    override fun toString(): String {
+        return "ICCloudInstance(uuid='$uuid', name='$name', status=$status)"
+    }
+
 
     private var status: InstanceStatus = InstanceStatus.UNKNOWN
     private var errorInfo: CloudErrorInfo? = null
@@ -264,6 +274,9 @@ class ICCloudInstance(
             }
         }
 
+        /**
+         * Find existing running instance/machine to be shown in the TC UI (eg. after TC restart)
+         */
         fun createRunning(vim: VimWrapper, uuid: String, name: String, image: ICCloudImage, vm: ManagedObjectReference): ICCloudInstance {
             val startTime =
                 vim.getProperty(vm, "config.extraConfig[\"guestinfo.teamcity-instance-startTime\"].value") as String
@@ -275,6 +288,8 @@ class ICCloudInstance(
             }
         }
     }
+
+
 }
 
 class LocalizedMethodFaultException(val fault: LocalizedMethodFault): RuntimeException(fault.localizedMessage)
