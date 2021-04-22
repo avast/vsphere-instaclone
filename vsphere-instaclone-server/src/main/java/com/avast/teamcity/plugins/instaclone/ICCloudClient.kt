@@ -88,6 +88,11 @@ class ICCloudClient(
         instance.terminate()
     }
 
+    override fun dispose() {
+        super.dispose()
+        logger.info("Disposing cloud instance")
+    }
+
     @Throws(CloudException::class)
     override fun findImageById(s: String): CloudImage? {
         return images[s]

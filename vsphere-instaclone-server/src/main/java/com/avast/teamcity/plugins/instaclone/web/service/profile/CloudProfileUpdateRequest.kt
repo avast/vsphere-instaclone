@@ -1,12 +1,14 @@
 package com.avast.teamcity.plugins.instaclone.web.service.profile
 
 import com.avast.teamcity.plugins.instaclone.ICCloudClientFactory
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import java.util.concurrent.TimeUnit
 
 /**
  *
  * @author Vitasek L.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class CloudProfileUpdateRequest(
     val extProjectId: String,
     val profileId: String?,

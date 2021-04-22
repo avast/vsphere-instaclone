@@ -11,9 +11,9 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.intellij.openapi.diagnostic.Logger
 import jetbrains.buildServer.clouds.CloudProfile
 import jetbrains.buildServer.clouds.server.CloudManagerBase
+import jetbrains.buildServer.serverSide.DuplicateIdException
 import jetbrains.buildServer.serverSide.ProjectManager
 import jetbrains.buildServer.serverSide.SProject
-import java.util.*
 import java.util.stream.Collectors
 
 /**
@@ -27,6 +27,7 @@ class CloudProfilesService(
 
     private val mapper = jacksonObjectMapper()
     private val logger = Logger.getInstance(CloudProfilesService::class.java.name)
+    private val profileLock = Any()
 
     data class ProfileItem(
         val profile: CloudProfile,
@@ -36,9 +37,12 @@ class CloudProfilesService(
     )
 
     data class ProfileInfo(
-        val projectName: String, val projectExtId: String,
+        val projectName: String,
+        val profileDescription: String,
+        val projectExtId: String,
         val profileId: String, val profileName: String,
         val profileEnabled: Boolean,
+        val profileParameters: MutableMap<String, String>,
         val sdkUrl: String,
         val templates: List<String>,
         @JsonRawValue
@@ -50,10 +54,12 @@ class CloudProfilesService(
         return findProfiles().map { profileItem ->
             ProfileInfo(
                 profileItem.project.name,
+                profileItem.profile.description,
                 profileItem.project.externalId,
                 profileItem.profile.profileId,
                 profileItem.profile.profileName,
                 profileItem.profile.isEnabled,
+                profileItem.profile.profileProperties,
                 profileItem.sdkUrl,
                 profileItem.templates,
                 profileItem.profile.profileProperties[ICCloudClientFactory.PROP_IMAGES] ?: "{}"
@@ -76,7 +82,8 @@ class CloudProfilesService(
     fun findProfiles(): List<ProfileItem> {
         val compareBy = compareBy<ProfileItem> { item -> item.project.name }
         //     val sortTableComparator = compareBy.thenBy { item -> item.profile.profileName }
-        return cloudManagerBase.listAllProfiles().stream().filter { profile -> profile.cloudCode == ICCloudClientFactory.CLOUD_CODE }
+        return cloudManagerBase.listAllProfiles().stream()
+            .filter { profile -> profile.cloudCode == ICCloudClientFactory.CLOUD_CODE }
             .map { profile ->
                 ProfileItem(
                     profile,
@@ -96,13 +103,34 @@ class CloudProfilesService(
             profileCreateRequest.customProfileParameters
         )
 
-        return cloudManagerBase.createProfile(projectId, CloudProfileDataImpl(profileCreateRequest.cloudCode,
-                                    profileCreateRequest.profileName, profileCreateRequest.description,
-                                    profileCreateRequest.terminateIdleTime, profileCreateRequest.enabled,
-                                    profileCreateRequest.customProfileParameters, emptyList()))
+        return try {
+            synchronized(profileLock) {
+                val listProfilesByProject = cloudManagerBase.listProfilesByProject(projectId, true)
+                val alreadyExisting =
+                    listProfilesByProject.find { profile -> profile.profileName == profileCreateRequest.profileName }
+                if (alreadyExisting != null) {
+                    throw java.lang.RuntimeException("TC create profile already exists - duplicate - projectId = $projectId AND profileName=${profileCreateRequest.profileName}")
+                }
+
+                cloudManagerBase.createProfile(
+                    projectId, CloudProfileDataImpl(
+                        profileCreateRequest.cloudCode,
+                        profileCreateRequest.profileName, profileCreateRequest.description,
+                        profileCreateRequest.terminateIdleTime, profileCreateRequest.enabled,
+                        profileCreateRequest.customProfileParameters, emptyList()
+                    )
+                )
+            }
+        } catch (e: DuplicateIdException) {
+            logger.warn(
+                "TC create profile bug - duplicate - projectId = ${projectId} AND profileName=${profileCreateRequest.profileName}",
+                e
+            )
+            throw e;
+        }
     }
 
-    fun updateProfile(profileUpdateRequest: CloudProfileUpdateRequest, cleanImageParameters : Boolean): CloudProfile {
+    fun updateProfile(profileUpdateRequest: CloudProfileUpdateRequest, cleanImageParameters: Boolean): CloudProfile {
         logger.info("Update cloud profile request: $profileUpdateRequest")
         val projectId = translateProjectId(profileUpdateRequest.extProjectId)
         val profileId = profileUpdateRequest.profileId
@@ -126,7 +154,9 @@ class CloudProfilesService(
             if (cleanImageParameters) emptyList() else profile.images
         )
 
-        return cloudManagerBase.updateProfile(projectId, profileId, cloudProfileData)
+        return synchronized(profileLock) {
+            cloudManagerBase.updateProfile(projectId, profileId, cloudProfileData)
+        }
     }
 
     private fun updatePropImagesParameterIfPresent(
@@ -159,7 +189,9 @@ class CloudProfilesService(
         logger.info("Remove cloud profile request: $removeRequest")
         val projectId = translateProjectId(removeRequest.extProjectId)
 
-        return cloudManagerBase.removeProfile(projectId, removeRequest.profileId)
+        return synchronized(profileLock) {
+            cloudManagerBase.removeProfile(projectId, removeRequest.profileId)
+        }
     }
 
 //    internal fun updateTestProfile(extProjectId: String, profileId: String): CloudProfile {
