@@ -4,10 +4,11 @@ import com.avast.teamcity.plugins.instaclone.web.service.CloudProfilesService
 import com.avast.teamcity.plugins.instaclone.web.service.profile.CloudProfileCreateRequest
 import com.avast.teamcity.plugins.instaclone.web.service.profile.CloudProfileRemoveRequest
 import com.avast.teamcity.plugins.instaclone.web.service.profile.CloudProfileUpdateRequest
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.intellij.openapi.diagnostic.Logger
 import jetbrains.buildServer.controllers.BaseController
+import jetbrains.buildServer.serverSide.auth.AuthUtil
+import jetbrains.buildServer.serverSide.auth.Permission
 import jetbrains.buildServer.serverSide.auth.SecurityContext
 import jetbrains.buildServer.web.openapi.WebControllerManager
 import org.springframework.http.MediaType
@@ -23,8 +24,9 @@ class ICProfileController(
     private val securityContext: SecurityContext
 ) {
 
-    private var mapper: ObjectMapper = jacksonObjectMapper()
+    private var mapper = jacksonObjectMapper()
     private val logger = Logger.getInstance(ICProfileController::class.java.name)
+
 
     init {
         webControllerManager.registerController(
@@ -32,6 +34,7 @@ class ICProfileController(
             object : BaseController() {
                 override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView {
                     return jsonRequestResponse(request, Void::class, response) {
+                        checkManageCloudPermission()
                         cloudProfilesService.getSimpleProfileInfos()
                     }
                 }
@@ -56,7 +59,13 @@ class ICProfileController(
                 override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView? {
                     return if (isPost(request)) {
                         jsonRequestResponse(request, CloudProfileUpdateRequest::class, response) {
-                            val profile = cloudProfilesService.updateProfile(it!!, (request.getParameter("clean") ?: "false").toBoolean())
+                            checkManageCloudPermission()
+                            checkProjectEditPermission(it!!.extProjectId)
+
+                            val profile = cloudProfilesService.updateProfile(
+                                it,
+                                (request.getParameter("clean") ?: "false").toBoolean()
+                            )
                             profile
                         }
                     } else {
@@ -73,7 +82,11 @@ class ICProfileController(
                 override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView? {
                     return if (isPost(request)) {
                         jsonRequestResponse(request, CloudProfileCreateRequest::class, response) {
-                            val profile = cloudProfilesService.createProfile(it!!)
+
+                            checkManageCloudPermission()
+                            checkProjectEditPermission(it!!.extProjectId)
+
+                            val profile = cloudProfilesService.createProfile(it)
                             profile
                         }
                     } else {
@@ -89,7 +102,10 @@ class ICProfileController(
                 override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView? {
                     return if (isPost(request)) {
                         jsonRequestResponse(request, CloudProfileRemoveRequest::class, response) {
-                            cloudProfilesService.removeProfile(it!!)
+                            checkManageCloudPermission()
+                            checkProjectEditPermission(it!!.extProjectId)
+
+                            cloudProfilesService.removeProfile(it)
                             null
                         }
                     } else {
@@ -112,27 +128,47 @@ class ICProfileController(
 //        )
     }
 
+    private fun checkProjectEditPermission(projectId: String) {
+        if (!AuthUtil.hasPermissionToManageProject(
+                securityContext.authorityHolder,
+                cloudProfilesService.translateProjectId(projectId)
+            )
+        ) {
+            throw IllegalAccessException("User has not edit permissions to access project with id $projectId")
+        }
+    }
 
-    private fun <T: Any> jsonRequestResponse(request: HttpServletRequest,
-                                             requestClass: KClass<T>,
-                                             response: HttpServletResponse,
-                                             resultValue: (T?) -> Any?): ModelAndView {
+    private fun checkManageCloudPermission() {
+        if (!AuthUtil.hasGlobalPermission(
+                securityContext.authorityHolder,Permission.MANAGE_AGENT_CLOUDS
+            )
+        ) {
+            throw IllegalAccessException("User has not permissions to edit cloud profiles")
+        }
+    }
+
+
+    private fun <T : Any> jsonRequestResponse(
+        request: HttpServletRequest,
+        requestClass: KClass<T>,
+        response: HttpServletResponse,
+        resultValue: (T?) -> Any?
+    ): ModelAndView {
         response.contentType = MediaType.APPLICATION_JSON_UTF8_VALUE
 
         val out = response.writer
         try {
             val parsedBody = if (requestClass == Void::class) {
                 null
-            }
-            else
+            } else
                 requestClass.let {
-                try {
-                    mapper.readValue(request.reader, requestClass.java)
-                } catch (e: Exception) {
-                    logger.error("Failed to parse request", e)
-                    throw ApiException("Failed to parse request: ${e.message}", e)
+                    try {
+                        mapper.readValue(request.reader, requestClass.java)
+                    } catch (e: Exception) {
+                        logger.error("Failed to parse request", e)
+                        throw ApiException("Failed to parse request: ${e.message}", e)
+                    }
                 }
-            }
 
             val result = try {
                 resultValue(parsedBody)
@@ -145,7 +181,10 @@ class ICProfileController(
             } else {
                 out.write("{}")
             }
-        } catch (apiEx : ApiException) {
+        } catch (accessEx : IllegalAccessException) {
+            logger.error("Failed to process request - not enough permissions", accessEx)
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, accessEx.message)
+        } catch (apiEx: ApiException) {
             logger.error("Failed to process request", apiEx)
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, apiEx.message)
         } catch (e: java.lang.Exception) {

@@ -181,7 +181,7 @@ class CloudProfilesService(
         }
     }
 
-    private fun translateProjectId(extProjectId: String): String {
+    fun translateProjectId(extProjectId: String): String {
         return projectManager.findProjectByExternalId(extProjectId)!!.projectId
     }
 
