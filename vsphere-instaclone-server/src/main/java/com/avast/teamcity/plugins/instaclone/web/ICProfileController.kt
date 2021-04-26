@@ -1,5 +1,6 @@
 package com.avast.teamcity.plugins.instaclone.web
 
+import com.avast.teamcity.plugins.instaclone.ICCloudClientFactory
 import com.avast.teamcity.plugins.instaclone.web.service.CloudProfilesService
 import com.avast.teamcity.plugins.instaclone.web.service.profile.CloudProfileCreateRequest
 import com.avast.teamcity.plugins.instaclone.web.service.profile.CloudProfileRemoveRequest
@@ -10,6 +11,7 @@ import jetbrains.buildServer.controllers.BaseController
 import jetbrains.buildServer.serverSide.auth.AuthUtil
 import jetbrains.buildServer.serverSide.auth.Permission
 import jetbrains.buildServer.serverSide.auth.SecurityContext
+import jetbrains.buildServer.web.openapi.PluginDescriptor
 import jetbrains.buildServer.web.openapi.WebControllerManager
 import org.springframework.http.MediaType
 import org.springframework.web.servlet.ModelAndView
@@ -19,6 +21,7 @@ import kotlin.reflect.KClass
 
 
 class ICProfileController(
+    private val pluginDescriptor: PluginDescriptor,
     private val cloudProfilesService: CloudProfilesService,
     webControllerManager: WebControllerManager,
     private val securityContext: SecurityContext
@@ -32,27 +35,16 @@ class ICProfileController(
         webControllerManager.registerController(
             "/app/instaprofiles/list",
             object : BaseController() {
-                override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView {
+                override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView? {
                     return jsonRequestResponse(request, Void::class, response) {
                         checkManageCloudPermission()
-                        cloudProfilesService.getSimpleProfileInfos()
+
+                        val cloudCode = request.getParameter("cloudCode") ?: ICCloudClientFactory.CLOUD_CODE
+                        cloudProfilesService.getSimpleProfileInfos(cloudCode)
                     }
                 }
             }
         )
-//        webControllerManager.registerController(
-//            "/app/instaprofiles/test",
-//            object : BaseController() {
-//                override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView {
-//                    val profile =
-//                        cloudProfilesService.createTestProfile(request.getParameter("projectId") as String)
-//
-//                    return jsonResponse(response) {
-//                        profile
-//                    }
-//                }
-//            }
-//        )
         webControllerManager.registerController(
             "/app/instaprofiles/update",
             object : BaseController() {
@@ -115,6 +107,18 @@ class ICProfileController(
                 }
             }
         )
+        webControllerManager.registerController(
+            "/instaprofiles.html",
+            object : BaseController() {
+                override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView {
+                    checkManageCloudPermission()
+                    val path = pluginDescriptor.getPluginResourcesPath("cloud-profiles.jsp")
+
+                    val model = mutableMapOf("profiles" to cloudProfilesService.findProfiles())
+                    return ModelAndView(path, model)
+                }
+            }
+        )
 //        webControllerManager.registerController(
 //            "/app/instaprofiles/testupdate",
 //            object : BaseController() {
@@ -153,7 +157,7 @@ class ICProfileController(
         requestClass: KClass<T>,
         response: HttpServletResponse,
         resultValue: (T?) -> Any?
-    ): ModelAndView {
+    ): ModelAndView? {
         response.contentType = MediaType.APPLICATION_JSON_UTF8_VALUE
 
         val out = response.writer
@@ -194,6 +198,6 @@ class ICProfileController(
         }
         out.flush()
 
-        return ModelAndView()
+        return null
     }
 }

@@ -96,3 +96,9 @@ Adjust for other systems and your requirements.
 If set, the shutdown script is run after the agent has unregistered
 from the server, but before the machine is deleted.
 This is an ideal place to release the machine's IP address, for example.
+
+## REST API
+This plugin extends standard TC REST api to be able to list, create, update, remove VSphere instaclone profiles. 
+[The extended API is described using Swagger aka OpenAPI v3](/etc/api/webapi.yaml).
+
+Additionaly there is a new "flat" view for profiles used defined by this plugin - `http://<teamcityurl>/instaprofiles.html`. 

@@ -50,8 +50,8 @@ class CloudProfilesService(
     )
 
 
-    fun getSimpleProfileInfos(): List<ProfileInfo> {
-        return findProfiles().map { profileItem ->
+    fun getSimpleProfileInfos(cloudCode: String): List<ProfileInfo> {
+        return findProfiles(cloudCode).map { profileItem ->
             ProfileInfo(
                 profileItem.project.name,
                 profileItem.profile.description,
@@ -79,11 +79,11 @@ class CloudProfilesService(
         }
     }
 
-    fun findProfiles(): List<ProfileItem> {
+    fun findProfiles(cloudCode: String = ICCloudClientFactory.CLOUD_CODE): List<ProfileItem> {
         val compareBy = compareBy<ProfileItem> { item -> item.project.name }
         //     val sortTableComparator = compareBy.thenBy { item -> item.profile.profileName }
         return cloudManagerBase.listAllProfiles().stream()
-            .filter { profile -> profile.cloudCode == ICCloudClientFactory.CLOUD_CODE }
+            .filter { profile -> profile.cloudCode == cloudCode}
             .map { profile ->
                 ProfileItem(
                     profile,
