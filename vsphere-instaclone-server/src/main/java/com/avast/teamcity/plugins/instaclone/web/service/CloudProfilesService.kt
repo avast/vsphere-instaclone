@@ -14,6 +14,7 @@ import jetbrains.buildServer.clouds.server.CloudManagerBase
 import jetbrains.buildServer.serverSide.DuplicateIdException
 import jetbrains.buildServer.serverSide.ProjectManager
 import jetbrains.buildServer.serverSide.SProject
+import jetbrains.buildServer.serverSide.crypt.EncryptUtil
 import java.util.stream.Collectors
 
 /**
@@ -59,7 +60,7 @@ class CloudProfilesService(
                 profileItem.profile.profileId,
                 profileItem.profile.profileName,
                 profileItem.profile.isEnabled,
-                profileItem.profile.profileProperties,
+                scrambleSdkPassword(profileItem.profile.profileProperties),
                 profileItem.sdkUrl,
                 profileItem.templates,
                 profileItem.profile.profileProperties[ICCloudClientFactory.PROP_IMAGES] ?: "{}"
@@ -78,6 +79,7 @@ class CloudProfilesService(
             emptyList()
         }
     }
+
 
     fun findProfiles(cloudCode: String = ICCloudClientFactory.CLOUD_CODE): List<ProfileItem> {
         val compareBy = compareBy<ProfileItem> { item -> item.project.name }
@@ -103,6 +105,8 @@ class CloudProfilesService(
             profileCreateRequest.customProfileParameters
         )
 
+        val customProfileParameters = unscramblePasswordParameter(profileCreateRequest.customProfileParameters)
+
         return try {
             synchronized(profileLock) {
                 val listProfilesByProject = cloudManagerBase.listProfilesByProject(projectId, true)
@@ -112,14 +116,15 @@ class CloudProfilesService(
                     throw java.lang.RuntimeException("TC create profile already exists - duplicate - projectId = $projectId AND profileName=${profileCreateRequest.profileName}")
                 }
 
-                cloudManagerBase.createProfile(
+                val cloudProfile = cloudManagerBase.createProfile(
                     projectId, CloudProfileDataImpl(
                         profileCreateRequest.cloudCode,
                         profileCreateRequest.profileName, profileCreateRequest.description,
                         profileCreateRequest.terminateIdleTime, profileCreateRequest.enabled,
-                        profileCreateRequest.customProfileParameters, emptyList()
+                        customProfileParameters, emptyList()
                     )
                 )
+                cloudProfile
             }
         } catch (e: DuplicateIdException) {
             logger.warn(
@@ -194,43 +199,35 @@ class CloudProfilesService(
         }
     }
 
-//    internal fun updateTestProfile(extProjectId: String, profileId: String): CloudProfile {
-//        val customProfileProperties = mutableMapOf(
-//            ICCloudClientFactory.PROP_IMAGES to """{"image-name2": {"template": "datacenter/vm/tc-agent-template2","instanceFolder": "datacenter/vm/tc-agents","maxInstances": 10}}""",
-//            ICCloudClientFactory.PROP_USERNAME to "asd2",
-//            ICCloudClientFactory.PROP_PASSWORD to "asd2",
-//            ICCloudClientFactory.PROP_PROFILE_UUID to UUID.randomUUID().toString(),
-//            ICCloudClientFactory.PROP_SDKURL to "http://vcsim:8989/sdk"
-//        )
-//
-//        return updateProfile(
-//            CloudProfileUpdateRequest(
-//                extProjectId, profileId, "test-profile", "description2",
-//                true, null, customProfileProperties
-//            ), true
-//        )
-//    }
-//
-//    fun createTestProfile(extProjectId: String): CloudProfile {
-//        val customProfileProperties = mutableMapOf(
-//            ICCloudClientFactory.PROP_IMAGES to """{"image-name2": {"template": "datacenter/vm/tc-agent-template","instanceFolder": "datacenter/vm/tc-agents","maxInstances": 10}}""",
-//            ICCloudClientFactory.PROP_USERNAME to "asd",
-//            ICCloudClientFactory.PROP_PASSWORD to "asd",
-//            ICCloudClientFactory.PROP_PROFILE_UUID to UUID.randomUUID().toString(),
-//            ICCloudClientFactory.PROP_SDKURL to "http://vcsim:8989/sdk"
-//        )
-//        return this.createProfile(
-//            extProjectId,
-//            CloudProfileDataImpl(
-//                ICCloudClientFactory.CLOUD_CODE,
-//                "test-profile",
-//                "test-profile-desc",
-//                TimeUnit.MINUTES.toMillis(30),
-//                true,
-//                customProfileProperties,
-//                emptyList()
-//            )
-//        )
-//    }
+
+    companion object {
+
+        fun unscramblePasswordParameter(profileProperties: MutableMap<String, String>): Map<String, String> {
+            return if (profileProperties.containsKey(ICCloudClientFactory.PROP_PASSWORD)) {
+                val newMap = HashMap(profileProperties)
+                val pass = profileProperties[ICCloudClientFactory.PROP_PASSWORD]
+                if (!EncryptUtil.isScrambled(pass)) {
+                    throw RuntimeException("Password is not scrambled")
+                }
+                newMap[ICCloudClientFactory.PROP_PASSWORD] =
+                    EncryptUtil.unscramble(pass ?: "")
+                newMap
+            } else {
+                profileProperties
+            }
+        }
+
+        fun scrambleSdkPassword(profileProperties: MutableMap<String, String>): MutableMap<String, String> {
+            return if (profileProperties.containsKey(ICCloudClientFactory.PROP_PASSWORD)) {
+                val newMap = HashMap(profileProperties)
+                newMap[ICCloudClientFactory.PROP_PASSWORD] =
+                    EncryptUtil.scramble(profileProperties[ICCloudClientFactory.PROP_PASSWORD] ?: "")
+                newMap
+            } else {
+                profileProperties
+            }
+        }
+
+    }
 
 }

@@ -7,7 +7,7 @@ servers:
   - url: 'http://localhost:8181'
 paths:
 
-  /app/instaprofiles/remove:
+  /app/vmic/remove:
     description: removes profile by given ids
     post:
       responses:
@@ -20,7 +20,7 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/removeProfileRequest"
-  /app/instaprofiles/update:
+  /app/vmic/update:
     post:
       description: Update given VMIC profile
       responses:
@@ -40,7 +40,7 @@ paths:
             type: boolean
             default: false
             description: if the value is true, the cloudImagesParameters are wiped on update profile
-  /app/instaprofiles/create:
+  /app/vmic/create:
     post:
       description: Create a new given VMIC profile
       responses:
@@ -53,7 +53,7 @@ paths:
           application/json:
             schema:
                 $ref: "#/components/schemas/cloudProfileCreateRequest"
-  /app/instaprofiles/list:
+  /app/vmic/list:
     get:
       description: List all VCSphere instaclode plugin profiles
       responses:

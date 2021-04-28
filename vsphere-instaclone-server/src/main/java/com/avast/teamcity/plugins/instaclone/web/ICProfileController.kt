@@ -4,6 +4,7 @@ import com.avast.teamcity.plugins.instaclone.ICCloudClientFactory
 import com.avast.teamcity.plugins.instaclone.web.service.CloudProfilesService
 import com.avast.teamcity.plugins.instaclone.web.service.profile.CloudProfileCreateRequest
 import com.avast.teamcity.plugins.instaclone.web.service.profile.CloudProfileRemoveRequest
+import com.avast.teamcity.plugins.instaclone.web.service.profile.CloudProfileResponse
 import com.avast.teamcity.plugins.instaclone.web.service.profile.CloudProfileUpdateRequest
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.intellij.openapi.diagnostic.Logger
@@ -33,7 +34,7 @@ class ICProfileController(
 
     init {
         webControllerManager.registerController(
-            "/app/instaprofiles/list",
+            "/app/${ICCloudClientFactory.CLOUD_CODE}/list",
             object : BaseController() {
                 override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView? {
                     return jsonRequestResponse(request, Void::class, response) {
@@ -46,7 +47,7 @@ class ICProfileController(
             }
         )
         webControllerManager.registerController(
-            "/app/instaprofiles/update",
+            "/app/${ICCloudClientFactory.CLOUD_CODE}/update",
             object : BaseController() {
                 override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView? {
                     return if (isPost(request)) {
@@ -58,7 +59,7 @@ class ICProfileController(
                                 it,
                                 (request.getParameter("clean") ?: "false").toBoolean()
                             )
-                            profile
+                            CloudProfileResponse(profile)
                         }
                     } else {
                         response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Only POST method is allowed")
@@ -69,7 +70,7 @@ class ICProfileController(
         )
 
         webControllerManager.registerController(
-            "/app/instaprofiles/create",
+            "/app/${ICCloudClientFactory.CLOUD_CODE}/create",
             object : BaseController() {
                 override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView? {
                     return if (isPost(request)) {
@@ -79,7 +80,7 @@ class ICProfileController(
                             checkProjectEditPermission(it!!.extProjectId)
 
                             val profile = cloudProfilesService.createProfile(it)
-                            profile
+                            CloudProfileResponse(profile)
                         }
                     } else {
                         response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Only POST method is allowed")
@@ -89,7 +90,7 @@ class ICProfileController(
             }
         )
         webControllerManager.registerController(
-            "/app/instaprofiles/remove",
+            "/app/${ICCloudClientFactory.CLOUD_CODE}/remove",
             object : BaseController() {
                 override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView? {
                     return if (isPost(request)) {
@@ -108,7 +109,7 @@ class ICProfileController(
             }
         )
         webControllerManager.registerController(
-            "/instaprofiles.html",
+            "/${ICCloudClientFactory.CLOUD_CODE}.html",
             object : BaseController() {
                 override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView {
                     checkManageCloudPermission()
@@ -120,7 +121,7 @@ class ICProfileController(
             }
         )
 //        webControllerManager.registerController(
-//            "/app/instaprofiles/testupdate",
+//            "/app/${ICCloudClientFactory.CLOUD_CODE}/testupdate",
 //            object : BaseController() {
 //                override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView {
 //

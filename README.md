@@ -101,4 +101,5 @@ This is an ideal place to release the machine's IP address, for example.
 This plugin extends standard TC REST api to be able to list, create, update, remove VSphere instaclone profiles. 
 [The extended API is described using Swagger aka OpenAPI v3](/etc/api/webapi.yaml).
 
-Additionaly there is a new "flat" view for profiles used defined by this plugin - `http://<teamcityurl>/instaprofiles.html`. 
+Additionaly there is a new "flat" view for profiles used defined by this plugin - `http://<teamcityurl>/vmic.html`. 
+It's necessary to TC `MANAGE_AGENT_CLOUDS` permission.

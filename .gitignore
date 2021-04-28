@@ -2,6 +2,8 @@
 target/
 .vscode/
 .settings/
+/decompile
+/gen
 .classpath
 .project
 **.iml
