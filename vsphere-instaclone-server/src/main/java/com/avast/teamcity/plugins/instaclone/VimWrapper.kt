@@ -1,14 +1,15 @@
 package com.avast.teamcity.plugins.instaclone
 
 import com.avast.teamcity.plugins.instaclone.utils.PropertyCollectorUtil
+import com.avast.teamcity.plugins.instaclone.web.service.VCenterAccountService
 import com.vmware.vim25.*
 import javax.xml.soap.DetailEntry
 import javax.xml.ws.soap.SOAPFaultException
 
 class VimWrapper(
     private val port: VimPortType,
-    private val username: String,
-    private val password: String,
+    private val vCenterAccountId: String,
+    private val accountService: VCenterAccountService,
     private val pluginClassLoader: ClassLoader
 ) {
 
@@ -18,8 +19,9 @@ class VimWrapper(
 
     private fun doLogin(faultMessage: String) {
         pluginClassLoader.inContext {
+            val account = accountService.getAccountById(vCenterAccountId)!!
             val sessionActive = sessionId != "" && try {
-                port.sessionIsActive(serviceContent.sessionManager, sessionId, username)
+                port.sessionIsActive(serviceContent.sessionManager, sessionId, account.username)
             } catch (e: Exception) {
                 false
             }
@@ -28,7 +30,7 @@ class VimWrapper(
                 throw RuntimeException(faultMessage)
             }
 
-            val userSession = port.login(serviceContent.sessionManager, username, password, null)
+            val userSession = port.login(serviceContent.sessionManager, account.username, account.password, null)
             sessionId = userSession.key
         }
     }
@@ -41,7 +43,8 @@ class VimWrapper(
 
     fun connectionLoginTest() {
         return try {
-            port.login(serviceContent.sessionManager, username, password, null)
+            val account = accountService.getAccountById(vCenterAccountId)!!
+            port.login(serviceContent.sessionManager, account.username, account.password, null)
             val property = getProperty(serviceContent.rootFolder, "name")
         } finally {
             try {
@@ -163,37 +166,3 @@ class VimWrapper(
         }
     }
 }
-
-/**
- * @param poolName - Name of pool to use
- * @return - ResourcePool object
- * @throws InvalidProperty
- * @throws RuntimeFault
- * @throws RemoteException
- * @throws MalformedURLException
- * @throws VSphereException
- */
-//@Throws(InvalidProperty::class, RuntimeFault::class, RemoteException::class, MalformedURLException::class)
-//private fun getResourcePoolByName(poolName: String, rootEntity: ManagedEntity): ResourcePool? {
-//    var rootEntity: ManagedEntity? = rootEntity
-//    if (rootEntity == null) rootEntity = getServiceInstance().getRootFolder()
-//    return InventoryNavigator(
-//        rootEntity
-//    ).searchManagedEntity(
-//        "ResourcePool", poolName
-//    )
-//}
-
-//fun getManagedEntities(serviceInstance: ServiceInstance, entityClass: String?): List<ManagedEntity>? {
-//    val managedEntities: MutableList<ManagedEntity> = ArrayList<ManagedEntity>()
-//    try {
-//        val inventoryNavigator = InventoryNavigator(serviceInstance.getRootFolder())
-//        for (me in inventoryNavigator.searchManagedEntities(entityClass)) {
-//            managedEntities.add(me)
-//        }
-//    } catch (e: RemoteException) {
-//        e.printStackTrace()
-//        throw IllegalArgumentException(e)
-//    }
-//    return managedEntities
-//}

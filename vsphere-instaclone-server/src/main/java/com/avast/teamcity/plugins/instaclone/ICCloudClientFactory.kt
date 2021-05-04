@@ -1,5 +1,6 @@
 package com.avast.teamcity.plugins.instaclone
 
+import com.avast.teamcity.plugins.instaclone.web.service.VCenterAccountService
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.vmware.vim25.VimPortType
@@ -32,7 +33,8 @@ class ICCloudClientFactory(
     private val pluginDescriptor: PluginDescriptor,
     cloudEventDispatcher: CloudEventDispatcher,
     private val agentPoolManager: AgentPoolManager,
-    private val buildAgentManager: BuildAgentManager
+    private val buildAgentManager: BuildAgentManager,
+    private val vCenterAccountService: VCenterAccountService
 ) : CloudClientFactory {
 
     private val defaultImagesJson: String = javaClass.getResource("/samples/imageProfileConfig.json")!!.readText()
@@ -69,12 +71,11 @@ class ICCloudClientFactory(
     ): CloudClientEx {
         return pluginClassLoader.inContext {
             val profileUuid = cloudClientParameters.getParameter(PROP_PROFILE_UUID)!!
-            val sdkUrl = cloudClientParameters.getParameter(PROP_SDKURL)
-            val vimPort = getVimPort(sdkUrl)
-            val username = cloudClientParameters.getParameter(PROP_USERNAME)!!
-            val password = cloudClientParameters.getParameter(PROP_PASSWORD)!!
+            val vCenterAccountId = cloudClientParameters.getParameter(PROP_VCENTER_ACCOUNT)!!
+            val account = vCenterAccountService.getAccountById(vCenterAccountId)!!
+            val vimPort = getVimPort(account.url)
             val imageConfig = cloudClientParameters.getParameter(PROP_IMAGES)!!
-            val vim = VimWrapper(vimPort, username, password, pluginClassLoader)
+            val vim = VimWrapper(vimPort, vCenterAccountId, vCenterAccountService, pluginClassLoader)
             ICCloudClient(vim, buildAgentManager, agentPoolManager, profileUuid, parseIcImageConfig(imageConfig))
         }
     }
@@ -84,7 +85,7 @@ class ICCloudClientFactory(
     }
 
     override fun getDisplayName(): String {
-        return "VMware Instaclone"
+        return "VMware InstacloneV2"
     }
 
     override fun getEditProfileUrl(): String {
@@ -94,7 +95,7 @@ class ICCloudClientFactory(
     override fun getInitialParameterValues(): Map<String, String> {
         val params = mutableMapOf<String, String>()
         params[PROP_IMAGES] = defaultImagesJson
-        params[PROP_PROFILE_UUID] = UUID.randomUUID().toString()
+        params[PROP_PROFILE_UUID] = initProfileUUID()
         return params
     }
 
@@ -106,25 +107,32 @@ class ICCloudClientFactory(
 
     override fun getPropertiesProcessor(): PropertiesProcessor {
         // perform validation
-        return ConfigPropertiesProcessor(pluginClassLoader, this)
+        return ConfigPropertiesProcessor(pluginClassLoader, this, vCenterAccountService)
     }
 
-
     companion object {
-        internal const val CLOUD_CODE = "vmic"
+
+        internal const val CLOUD_CODE = "vmic2"
+        internal const val CLOUD_CODE_WEB = "vmic"
         internal const val PROP_CONNECTION_FAILED = "vmwareInstacloneConnectionInfo"
         internal const val PROP_SDKURL = "vmwareInstacloneSdkUrl"
         internal const val PROP_USERNAME = "vmwareInstacloneUsername"
         internal const val PROP_PASSWORD = "vmwareInstaclonePassword"
         internal const val PROP_PROFILE_UUID = "vmwareInstacloneProfileUuid"
+        internal const val PROP_VCENTER_ACCOUNT = "vmwareInstacloneVCenterAccount"
+        internal const val PROP_VCENTER_ACCOUNT_HASH = "vmwareInstacloneVCenterAccountHash"
         internal const val PROP_IMAGES: String = "vmwareInstacloneImages"
 
-        val REQUIRED_PROPS = arrayOf(PROP_SDKURL, PROP_USERNAME, PROP_PASSWORD, PROP_IMAGES)
+        val REQUIRED_PROPS = arrayOf(PROP_VCENTER_ACCOUNT, PROP_IMAGES)
 
         private val mapper = jacksonObjectMapper()
 
         fun parseIcImageConfig(imageConfig: String): Map<String, ICImageConfig> {
             return mapper.readValue(imageConfig)
+        }
+
+        fun initProfileUUID() : String {
+            return UUID.randomUUID().toString()
         }
     }
 

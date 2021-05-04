@@ -12,10 +12,10 @@ import jetbrains.buildServer.clouds.CloudProfile
  */
 class CloudProfileResponse(private val cloudProfile : CloudProfile) : CloudProfile by cloudProfile {
 
-    private val profilePropertiesScrambled = CloudProfilesService.scrambleSdkPassword(cloudProfile.profileProperties)
+    private val profilePropertiesClean = CloudProfilesService.removeVCenterAccount(cloudProfile.profileProperties)
 
     override fun getProfileProperties(): MutableMap<String, String> {
-        return profilePropertiesScrambled
+        return profilePropertiesClean
     }
 
     @JsonIgnore

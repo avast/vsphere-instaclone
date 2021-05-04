@@ -2,10 +2,7 @@ package com.avast.teamcity.plugins.instaclone.web.service
 
 import com.avast.teamcity.plugins.instaclone.ICCloudClientFactory
 import com.avast.teamcity.plugins.instaclone.web.ApiException
-import com.avast.teamcity.plugins.instaclone.web.service.profile.CloudProfileCreateRequest
-import com.avast.teamcity.plugins.instaclone.web.service.profile.CloudProfileDataImpl
-import com.avast.teamcity.plugins.instaclone.web.service.profile.CloudProfileRemoveRequest
-import com.avast.teamcity.plugins.instaclone.web.service.profile.CloudProfileUpdateRequest
+import com.avast.teamcity.plugins.instaclone.web.service.profile.*
 import com.fasterxml.jackson.annotation.JsonRawValue
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.intellij.openapi.diagnostic.Logger
@@ -14,7 +11,6 @@ import jetbrains.buildServer.clouds.server.CloudManagerBase
 import jetbrains.buildServer.serverSide.DuplicateIdException
 import jetbrains.buildServer.serverSide.ProjectManager
 import jetbrains.buildServer.serverSide.SProject
-import jetbrains.buildServer.serverSide.crypt.EncryptUtil
 import java.util.stream.Collectors
 
 /**
@@ -23,7 +19,8 @@ import java.util.stream.Collectors
  */
 class CloudProfilesService(
     private val cloudManagerBase: CloudManagerBase,
-    private val projectManager: ProjectManager
+    private val projectManager: ProjectManager,
+    private val vCenterAccountService: VCenterAccountService
 ) {
 
     private val mapper = jacksonObjectMapper()
@@ -33,6 +30,7 @@ class CloudProfilesService(
     data class ProfileItem(
         val profile: CloudProfile,
         val project: SProject,
+        val accountId: String?,
         val sdkUrl: String,
         val templates: List<String>
     )
@@ -45,6 +43,7 @@ class CloudProfilesService(
         val profileEnabled: Boolean,
         val profileParameters: MutableMap<String, String>,
         val sdkUrl: String,
+        val vCenterAccount: String?,
         val templates: List<String>,
         @JsonRawValue
         val imageConfigJson: String
@@ -60,8 +59,9 @@ class CloudProfilesService(
                 profileItem.profile.profileId,
                 profileItem.profile.profileName,
                 profileItem.profile.isEnabled,
-                scrambleSdkPassword(profileItem.profile.profileProperties),
+                removeVCenterAccount(profileItem.profile.profileProperties),
                 profileItem.sdkUrl,
+                profileItem.accountId,
                 profileItem.templates,
                 profileItem.profile.profileProperties[ICCloudClientFactory.PROP_IMAGES] ?: "{}"
             )
@@ -85,16 +85,61 @@ class CloudProfilesService(
         val compareBy = compareBy<ProfileItem> { item -> item.project.name }
         //     val sortTableComparator = compareBy.thenBy { item -> item.profile.profileName }
         return cloudManagerBase.listAllProfiles().stream()
-            .filter { profile -> profile.cloudCode == cloudCode}
+            .filter { profile -> profile.cloudCode == cloudCode }
             .map { profile ->
+                val accountId = profile.profileProperties[ICCloudClientFactory.PROP_VCENTER_ACCOUNT]
+                val accountById = vCenterAccountService.getAccountById(accountId)
+
                 ProfileItem(
                     profile,
                     projectManager.findProjectById(profile.projectId)!!,
-                    profile.profileProperties[ICCloudClientFactory.PROP_SDKURL] ?: "",
+                    accountId,
+                    accountById?.url ?: "",
                     getProfileTemplates(profile.profileProperties[ICCloudClientFactory.PROP_IMAGES] ?: "")
                 )
             }.sorted(compareBy).collect(Collectors.toList())
     }
+
+    fun updateProfileAccounts(accountsUpdateRequest: AccountsUpdateRequest) {
+        val storeAccounts = vCenterAccountService.storeAccounts(accountsUpdateRequest)
+
+        storeAccounts.accounts.forEach {
+            updateProfileAccount(it)
+        }
+    }
+
+    private fun updateProfileAccount(updateAccount: VCenterAccount) {
+        val accountHash = updateAccount.hash()
+        findProfiles()
+            .filter { profile -> profile.accountId == updateAccount.id }
+            .filter { profile -> shouldUpdateProfile(profile.profile.profileProperties, accountHash) }
+            .forEach { profileInfo ->
+
+                val cloudProfileUpdateRequest = CloudProfileUpdateRequest(
+                    profileInfo.project.externalId,
+                    profileInfo.profile.profileId,
+                    profileInfo.profile.profileName,
+                    profileInfo.profile.description,
+                    profileInfo.profile.isEnabled,
+                    updateAccount.id,
+                    profileInfo.profile.terminateIdleTime,
+                    updateAccountHash(profileInfo.profile.profileProperties, accountHash)
+                )
+
+                updateProfile(cloudProfileUpdateRequest, false) // don't delete cloudImageparameters
+            }
+    }
+
+    private fun updateAccountHash(properties: Map<String, String>, newHash : String): MutableMap<String, String> {
+        val map = HashMap(properties)
+        map[ICCloudClientFactory.PROP_VCENTER_ACCOUNT_HASH] = newHash
+        return map
+    }
+
+    private fun shouldUpdateProfile(properties: Map<String, String>, accountHash: String): Boolean {
+        return accountHash != properties[ICCloudClientFactory.PROP_VCENTER_ACCOUNT_HASH]
+    }
+
 
     fun createProfile(profileCreateRequest: CloudProfileCreateRequest): CloudProfile {
         logger.info("Create cloud profile request: $profileCreateRequest")
@@ -105,7 +150,10 @@ class CloudProfilesService(
             profileCreateRequest.customProfileParameters
         )
 
-        val customProfileParameters = unscramblePasswordParameter(profileCreateRequest.customProfileParameters)
+        vCenterAccountService.updateAccountProperties(profileCreateRequest.vCenterAccount, profileCreateRequest.customProfileParameters)
+
+        val customProfileParameters = profileCreateRequest.customProfileParameters
+        customProfileParameters[ICCloudClientFactory.PROP_PROFILE_UUID] = ICCloudClientFactory.initProfileUUID()
 
         return try {
             synchronized(profileLock) {
@@ -128,10 +176,10 @@ class CloudProfilesService(
             }
         } catch (e: DuplicateIdException) {
             logger.warn(
-                "TC create profile bug - duplicate - projectId = ${projectId} AND profileName=${profileCreateRequest.profileName}",
+                "TC create profile bug - duplicate - projectId = $projectId AND profileName=${profileCreateRequest.profileName}",
                 e
             )
-            throw e;
+            throw e
         }
     }
 
@@ -147,20 +195,31 @@ class CloudProfilesService(
 
         profileProperties.putAll(profileUpdateRequest.customProfileParameters) // overwrite parameters
 
+        vCenterAccountService.updateAccountProperties(profileUpdateRequest.vCenterAccount, profileProperties)
+
         updatePropImagesParameterIfPresent(profileProperties)
 
+        val enabled = profileUpdateRequest.enabled ?: profile.isEnabled
+
+        updateEnabledParameterIfPresent(enabled, profileProperties)
 
         val cloudProfileData = CloudProfileDataImpl(
             profile.cloudCode, profileUpdateRequest.profileName,
             profileUpdateRequest.description,
             profileUpdateRequest.terminateIdleTime ?: profile.terminateIdleTime,
-            profileUpdateRequest.enabled,
+            enabled,
             profileProperties,
             if (cleanImageParameters) emptyList() else profile.images
         )
 
         return synchronized(profileLock) {
             cloudManagerBase.updateProfile(projectId, profileId, cloudProfileData)
+        }
+    }
+
+    private fun updateEnabledParameterIfPresent(enabled: Boolean, profileProperties: java.util.HashMap<String, String>) {
+        if (profileProperties.containsKey("enabled")) {
+            profileProperties["enabled"] = enabled.toString()
         }
     }
 
@@ -186,7 +245,7 @@ class CloudProfilesService(
         }
     }
 
-    fun translateProjectId(extProjectId: String): String {
+    private fun translateProjectId(extProjectId: String): String {
         return projectManager.findProjectByExternalId(extProjectId)!!.projectId
     }
 
@@ -202,30 +261,13 @@ class CloudProfilesService(
 
     companion object {
 
-        fun unscramblePasswordParameter(profileProperties: MutableMap<String, String>): Map<String, String> {
-            return if (profileProperties.containsKey(ICCloudClientFactory.PROP_PASSWORD)) {
-                val newMap = HashMap(profileProperties)
-                val pass = profileProperties[ICCloudClientFactory.PROP_PASSWORD]
-                if (!EncryptUtil.isScrambled(pass)) {
-                    throw RuntimeException("Password is not scrambled")
-                }
-                newMap[ICCloudClientFactory.PROP_PASSWORD] =
-                    EncryptUtil.unscramble(pass ?: "")
-                newMap
-            } else {
-                profileProperties
-            }
-        }
+        fun removeVCenterAccount(profileProperties: MutableMap<String, String>): MutableMap<String, String> {
+            val newMap = HashMap(profileProperties)
+            newMap.remove(ICCloudClientFactory.PROP_PASSWORD)
+            newMap.remove(ICCloudClientFactory.PROP_USERNAME)
+            newMap.remove(ICCloudClientFactory.PROP_VCENTER_ACCOUNT_HASH)
 
-        fun scrambleSdkPassword(profileProperties: MutableMap<String, String>): MutableMap<String, String> {
-            return if (profileProperties.containsKey(ICCloudClientFactory.PROP_PASSWORD)) {
-                val newMap = HashMap(profileProperties)
-                newMap[ICCloudClientFactory.PROP_PASSWORD] =
-                    EncryptUtil.scramble(profileProperties[ICCloudClientFactory.PROP_PASSWORD] ?: "")
-                newMap
-            } else {
-                profileProperties
-            }
+            return newMap
         }
 
     }

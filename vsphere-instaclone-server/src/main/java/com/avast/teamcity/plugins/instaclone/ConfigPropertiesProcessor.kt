@@ -1,5 +1,7 @@
 package com.avast.teamcity.plugins.instaclone
 
+import com.avast.teamcity.plugins.instaclone.web.service.VCenterAccountService
+import com.avast.teamcity.plugins.instaclone.web.service.profile.VCenterAccount
 import jetbrains.buildServer.serverSide.InvalidProperty
 import jetbrains.buildServer.serverSide.PropertiesProcessor
 import org.springframework.util.StringUtils
@@ -10,7 +12,8 @@ import org.springframework.util.StringUtils
  */
 class ConfigPropertiesProcessor(
     private val pluginClassLoader: ClassLoader,
-    private val icCloudClientFactory: ICCloudClientFactory
+    private val icCloudClientFactory: ICCloudClientFactory,
+    private val vCenterAccountService : VCenterAccountService
 ) :
     PropertiesProcessor {
     override fun process(propsMap: MutableMap<String, String>): MutableCollection<InvalidProperty> {
@@ -39,23 +42,40 @@ class ConfigPropertiesProcessor(
                 result.add(InvalidProperty(ICCloudClientFactory.PROP_IMAGES, "Parsing JSON error: ${e.message}"))
             }
         }
-        if (result.isEmpty()) {
-            doConnectionTest(propsMap, result)
+
+        propsMap[ICCloudClientFactory.PROP_VCENTER_ACCOUNT]?.let {vCenterAccountId ->
+            val vCenterAccount = vCenterAccountService.getAccountById(vCenterAccountId)
+            if (vCenterAccount == null) {
+                result.add(
+                    InvalidProperty(
+                        ICCloudClientFactory.PROP_VCENTER_ACCOUNT,
+                        "VCenter Account with $vCenterAccountId ID was not found"
+                    )
+                )
+            }
+            vCenterAccount?.let { account ->
+                if (result.isEmpty()) {
+                    doConnectionTest(account, propsMap, result)
+                }
+                propsMap[ICCloudClientFactory.PROP_VCENTER_ACCOUNT_HASH] = account.hash()
+            }
         }
+
         return result
     }
 
     private fun doConnectionTest(
+        vCenterAccount: VCenterAccount,
         propsMap: MutableMap<String, String>,
         result: MutableList<InvalidProperty>
     ) {
         try {
             pluginClassLoader.inContext {
-                val vimPort = icCloudClientFactory.getVimPort(propsMap[ICCloudClientFactory.PROP_SDKURL])
+                val vimPort = icCloudClientFactory.getVimPort(vCenterAccount.url)
                 val vim = VimWrapper(
                     vimPort,
-                    propsMap[ICCloudClientFactory.PROP_USERNAME]!!,
-                    propsMap[ICCloudClientFactory.PROP_PASSWORD]!!,
+                    propsMap[ICCloudClientFactory.PROP_VCENTER_ACCOUNT]!!,
+                    vCenterAccountService,
                     pluginClassLoader
                 )
                 vim.connectionLoginTest()

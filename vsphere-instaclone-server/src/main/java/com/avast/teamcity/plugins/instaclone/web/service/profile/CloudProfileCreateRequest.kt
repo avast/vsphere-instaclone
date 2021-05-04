@@ -14,6 +14,7 @@ data class CloudProfileCreateRequest(
     val extProjectId: String,
     val profileName: String,
     val description: String = "",
+    val vCenterAccount: String = "",
     val enabled: Boolean = true,
     val terminateIdleTime: Long? = TimeUnit.MINUTES.toMillis(30),
     val customProfileParameters: MutableMap<String, String>
