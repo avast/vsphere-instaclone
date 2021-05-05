@@ -52,7 +52,7 @@ class VCenterAccountService(
             val toFile = file.toFile()
             if (toFile.isFile && toFile.exists()) {
                 try {
-                    return RSAUtil.getPrivateKey(Files.readAllBytes(file))
+                    return RSAUtil.getPrivateKeyPem(Files.readAllBytes(file))
                 } catch (e: Exception) {
                     logger.error("VCenterAccountService - couldn't load Accounts Private Key $file", e)
                     throw RuntimeException(
@@ -73,7 +73,7 @@ class VCenterAccountService(
             path = TeamCityProperties.getPropertyOrNull("teamcity.vsphereinstaclone.accountsPkPath")
             if (path == null) {
                 path =
-                    Paths.get(SystemProperties.getUserHome(), "vsphereinstaclone", "accountsPk").toFile().absolutePath
+                    Paths.get(SystemProperties.getUserHome(), "vsphereinstaclone", "accounts-pk.pem").toFile().absolutePath
             }
         }
         return path

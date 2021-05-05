@@ -34,6 +34,7 @@
         <th>Profile Name</th>
         <th>Profile Id</th>
         <th></th>
+        <th>VCenterAccount</th>
         <th>SDK Url</th>
         <th>Templates</th>
     </tr>
@@ -68,6 +69,11 @@
                         <a href="#" onclick="enableOrDisableProfile('<bs:forJs>${item.project.externalId}</bs:forJs>',
                                 '<bs:forJs>${item.profile.profileId}</bs:forJs>', 'enable'); return false">Enable</a>
                     </c:if>
+                </c:if>
+            </td>
+            <td>
+                <c:if test="${item.accountId != null}">
+                    <code><c:out value="${item.accountId}"/></code>
                 </c:if>
             </td>
             <td>

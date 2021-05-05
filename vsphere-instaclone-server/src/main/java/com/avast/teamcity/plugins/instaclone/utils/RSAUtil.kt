@@ -1,8 +1,10 @@
 package com.avast.teamcity.plugins.instaclone.utils
 
 import com.intellij.openapi.diagnostic.Logger
+import org.apache.commons.codec.binary.Base64
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.nio.charset.StandardCharsets
 import java.security.*
 import java.security.spec.InvalidKeySpecException
 import java.security.spec.PKCS8EncodedKeySpec
@@ -28,11 +30,27 @@ object RSAUtil {
             logger.error("Error getting public key", e)
             throw RuntimeException("Failed to get public key", e)
         }
+    }
 
+    fun getPrivateKeyPem(encodeKey: ByteArray): PrivateKey {
+        return getPrivateKey(decodePem(encodeKey))
+    }
+
+    fun getPublicKeyPem(encodeKey: ByteArray): PublicKey {
+        return getPublicKey(decodePem(encodeKey))
+    }
+
+    private fun decodePem(encodeKey: ByteArray): ByteArray {
+        val content = String(encodeKey, StandardCharsets.US_ASCII)
+        val keyPem: String = content
+            .replace(Regex("-----BEGIN.*?KEY-----"), "")
+            .replace("\r\n", "")
+            .replace("\n", "")
+            .replace(Regex("-----END.*?KEY-----"), "")
+        return Base64.decodeBase64(keyPem)
     }
 
     fun getPrivateKey(encodeKey: ByteArray): PrivateKey {
-
         val keySpec = PKCS8EncodedKeySpec(encodeKey)
         try {
             return KeyFactory.getInstance("RSA").generatePrivate(keySpec)

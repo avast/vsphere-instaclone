@@ -1,8 +1,8 @@
 package com.avast.teamcity.plugins.instaclone;
 
 import com.avast.teamcity.plugins.instaclone.utils.AESUtil;
-import com.avast.teamcity.plugins.instaclone.web.service.RSACipher;
 import com.avast.teamcity.plugins.instaclone.utils.RSAUtil;
+import com.avast.teamcity.plugins.instaclone.web.service.RSACipher;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.junit.Ignore;
@@ -22,6 +22,21 @@ import java.security.PublicKey;
  */
 @Ignore
 public class Encrypt {
+
+    @Test
+    public void testReadKey() {
+        String key = "-----BEGIN PUBLIC KEY-----\n" +
+                "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsjtGIk8SxD+OEiBpP2/T\n" +
+                "JUAF0upwuKGMk6wH8Rwov88VvzJrVm2NCticTk5FUg+UG5r8JArrV4tJPRHQyvqK\n" +
+                "wF4NiksuvOjv3HyIf4oaOhZjT8hDne1Bfv+cFqZJ61Gk0MjANh/T5q9vxER/7TdU\n" +
+                "NHKpoRV+NVlKN5bEU/NQ5FQjVXicfswxh6Y6fl2PIFqT2CfjD+FkBPU1iT9qyJYH\n" +
+                "A38IRvwNtcitFgCeZwdGPoxiPPh1WHY8VxpUVBv/2JsUtrB/rAIbGqZoxAIWvijJ\n" +
+                "Pe9o1TY3VlOzk9ASZ1AeatvOir+iDVJ5OpKmLnzc46QgGPUsjIyo6Sje9dxpGtoG\n" +
+                "QQIDAQAB\n" +
+                "-----END PUBLIC KEY-----";
+
+        final PublicKey publicKeyPem = RSAUtil.INSTANCE.getPublicKeyPem(key.getBytes());
+    }
 
     @Test
     public void testEncrypt2() throws IOException {
