@@ -3,8 +3,7 @@ package com.avast.teamcity.plugins.instaclone.web.service
 import com.avast.teamcity.plugins.instaclone.ICCloudClientFactory
 import com.avast.teamcity.plugins.instaclone.web.ApiException
 import com.avast.teamcity.plugins.instaclone.web.service.profile.*
-import com.fasterxml.jackson.annotation.JsonRawValue
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.databind.JsonNode
 import com.intellij.openapi.diagnostic.Logger
 import jetbrains.buildServer.clouds.CloudProfile
 import jetbrains.buildServer.clouds.server.CloudManagerBase
@@ -23,7 +22,6 @@ class CloudProfilesService(
     private val vCenterAccountService: VCenterAccountService
 ) {
 
-    private val mapper = jacksonObjectMapper()
     private val logger = Logger.getInstance(CloudProfilesService::class.java.name)
     private val profileLock = Any()
 
@@ -45,13 +43,13 @@ class CloudProfilesService(
         val sdkUrl: String,
         val vCenterAccount: String?,
         val templates: List<String>,
-        @JsonRawValue
-        val imageConfigJson: String
+        val imageConfigJson: JsonNode
     )
 
 
     fun getSimpleProfileInfos(cloudCode: String): List<ProfileInfo> {
         return findProfiles(cloudCode).map { profileItem ->
+            val imageConfig = profileItem.profile.profileProperties[ICCloudClientFactory.PROP_IMAGES] ?: "{}"
             ProfileInfo(
                 profileItem.project.name,
                 profileItem.profile.description,
@@ -63,7 +61,7 @@ class CloudProfilesService(
                 profileItem.sdkUrl,
                 profileItem.accountId,
                 profileItem.templates,
-                profileItem.profile.profileProperties[ICCloudClientFactory.PROP_IMAGES] ?: "{}"
+                ICCloudClientFactory.getImageConfigMapper(imageConfig).readTree(imageConfig)
             )
         }
     }
@@ -130,7 +128,7 @@ class CloudProfilesService(
             }
     }
 
-    private fun updateAccountHash(properties: Map<String, String>, newHash : String): MutableMap<String, String> {
+    private fun updateAccountHash(properties: Map<String, String>, newHash: String): MutableMap<String, String> {
         val map = HashMap(properties)
         map[ICCloudClientFactory.PROP_VCENTER_ACCOUNT_HASH] = newHash
         return map
@@ -150,7 +148,10 @@ class CloudProfilesService(
             profileCreateRequest.customProfileParameters
         )
 
-        vCenterAccountService.updateAccountProperties(profileCreateRequest.vCenterAccount, profileCreateRequest.customProfileParameters)
+        vCenterAccountService.updateAccountProperties(
+            profileCreateRequest.vCenterAccount,
+            profileCreateRequest.customProfileParameters
+        )
 
         val customProfileParameters = profileCreateRequest.customProfileParameters
         customProfileParameters[ICCloudClientFactory.PROP_PROFILE_UUID] = ICCloudClientFactory.initProfileUUID()
@@ -193,6 +194,7 @@ class CloudProfilesService(
 
         val profileProperties = HashMap(profile.profileProperties)
 
+        resetTerminateConditions(profileProperties)
         profileProperties.putAll(profileUpdateRequest.customProfileParameters) // overwrite parameters
 
         vCenterAccountService.updateAccountProperties(profileUpdateRequest.vCenterAccount, profileProperties)
@@ -217,7 +219,16 @@ class CloudProfilesService(
         }
     }
 
-    private fun updateEnabledParameterIfPresent(enabled: Boolean, profileProperties: java.util.HashMap<String, String>) {
+    private fun resetTerminateConditions(profileProperties: MutableMap<String, String>) {
+        TERMINATE_CONDITIONS_PARAMS.forEach {
+            profileProperties.remove(it)
+        }
+    }
+
+    private fun updateEnabledParameterIfPresent(
+        enabled: Boolean,
+        profileProperties: java.util.HashMap<String, String>
+    ) {
         if (profileProperties.containsKey("enabled")) {
             profileProperties["enabled"] = enabled.toString()
         }
@@ -228,13 +239,13 @@ class CloudProfilesService(
     ) {
         if (customProfileParameters.containsKey(ICCloudClientFactory.PROP_IMAGES)) {
             val imagesJson = customProfileParameters[ICCloudClientFactory.PROP_IMAGES]
-            if (imagesJson != null) {
+            imagesJson?.let { config ->
                 try {
-                    val parsedIcImageConfig = mapper.readTree(imagesJson)
+                    val mapper = ICCloudClientFactory.getImageConfigMapper(config)
+                    val parsedIcImageConfig = mapper.readTree(config)
                     // let's reformat JSON to make it more readable for user in UI
                     val formattedValue = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(parsedIcImageConfig)
                     customProfileParameters[ICCloudClientFactory.PROP_IMAGES] = formattedValue
-
                 } catch (e: Exception) {
                     throw ApiException(
                         "Failed to parse ${ICCloudClientFactory.PROP_IMAGES} custom profile parameter",
@@ -260,6 +271,15 @@ class CloudProfilesService(
 
 
     companion object {
+
+        private const val TERMINATE_CONDITIONS_NEXT_HOUR = "next-hour"
+        private const val TERMINATE_CONDITIONS_TOTAL_WORK_TIME = "total-work-time"
+        private const val TERMINATE_CONDITIONS_TERMINATE_AFTER_BUILD = "terminate-after-build"
+        private val TERMINATE_CONDITIONS_PARAMS = setOf(
+            TERMINATE_CONDITIONS_NEXT_HOUR,
+            TERMINATE_CONDITIONS_TOTAL_WORK_TIME,
+            TERMINATE_CONDITIONS_TERMINATE_AFTER_BUILD
+        )
 
         fun removeVCenterAccount(profileProperties: MutableMap<String, String>): MutableMap<String, String> {
             val newMap = HashMap(profileProperties)

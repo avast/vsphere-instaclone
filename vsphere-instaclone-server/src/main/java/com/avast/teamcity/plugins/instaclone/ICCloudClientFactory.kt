@@ -1,8 +1,13 @@
 package com.avast.teamcity.plugins.instaclone
 
 import com.avast.teamcity.plugins.instaclone.web.service.VCenterAccountService
+import com.fasterxml.jackson.core.JsonFactory
+import com.fasterxml.jackson.core.format.DataFormatDetector
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.vmware.vim25.VimPortType
 import com.vmware.vim25.VimService
 import jetbrains.buildServer.clouds.*
@@ -37,7 +42,7 @@ class ICCloudClientFactory(
     private val vCenterAccountService: VCenterAccountService
 ) : CloudClientFactory {
 
-    private val defaultImagesJson: String = javaClass.getResource("/samples/imageProfileConfig.json")!!.readText()
+    private val defaultImagesJson: String = javaClass.getResource("/samples/imageProfileConfig.yaml")!!.readText()
 
     private val vimService = pluginClassLoader.inContext {
         VimService()
@@ -125,10 +130,25 @@ class ICCloudClientFactory(
 
         val REQUIRED_PROPS = arrayOf(PROP_VCENTER_ACCOUNT, PROP_IMAGES)
 
-        private val mapper = jacksonObjectMapper()
+        private val formatDetector = DataFormatDetector(mutableListOf(YAMLFactory(), JsonFactory()))
+        private val jsonMapper = jacksonObjectMapper()
+        private val yamlMapper = ObjectMapper(YAMLFactory()).registerKotlinModule()
+
+        fun getImageConfigMapper(imageConfig: String): ObjectMapper {
+            val findFormat = formatDetector.findFormat(imageConfig.toByteArray())
+            if (!findFormat.hasMatch()) {
+                throw RuntimeException("Cannot detect input format for imageConfig $imageConfig")
+            }
+
+            return if (findFormat.match.formatName == jsonMapper.factory.formatName) {
+                jsonMapper
+            } else {
+                yamlMapper
+            }
+        }
 
         fun parseIcImageConfig(imageConfig: String): Map<String, ICImageConfig> {
-            return mapper.readValue(imageConfig)
+            return getImageConfigMapper(imageConfig).readValue(imageConfig)
         }
 
         fun initProfileUUID() : String {

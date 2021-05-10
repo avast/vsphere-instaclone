@@ -2,7 +2,13 @@ package com.avast.teamcity.plugins.instaclone.utils
 
 import com.intellij.openapi.diagnostic.Logger
 import org.apache.commons.codec.binary.Base64
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
+import org.bouncycastle.openssl.PEMKeyPair
+import org.bouncycastle.openssl.PEMParser
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileReader
 import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.security.*
@@ -12,6 +18,7 @@ import java.security.spec.X509EncodedKeySpec
 import javax.crypto.Cipher
 import javax.crypto.CipherOutputStream
 import javax.crypto.NoSuchPaddingException
+
 
 object RSAUtil {
     private val logger = Logger.getInstance(
@@ -31,6 +38,24 @@ object RSAUtil {
             throw RuntimeException("Failed to get public key", e)
         }
     }
+
+
+    fun getPrivateKeyPem(file: File): PrivateKey {
+        FileReader(file).use { keyReader ->
+            val pemParser = PEMParser(keyReader)
+
+            val readObject = pemParser.readObject()
+            val privateKeyInfo =
+                if (readObject is PEMKeyPair) {
+                    PrivateKeyInfo.getInstance(readObject.privateKeyInfo)
+                } else {
+                    PrivateKeyInfo.getInstance(readObject)
+                }
+
+            return JcaPEMKeyConverter().getPrivateKey(privateKeyInfo)
+        }
+    }
+
 
     fun getPrivateKeyPem(encodeKey: ByteArray): PrivateKey {
         return getPrivateKey(decodePem(encodeKey))

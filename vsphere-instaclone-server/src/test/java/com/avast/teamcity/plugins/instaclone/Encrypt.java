@@ -23,6 +23,12 @@ import java.security.PublicKey;
 @Ignore
 public class Encrypt {
 
+//    @Test
+//    public void readPrivateKey() throws IOException {
+//        //final RSAPrivateKey rsaPrivateKey = RSAUtil.INSTANCE.readPrivateKey(new File("c:\\develope\\vsphere-instaclone\\KeyPair\\private2.pem"));
+//        //final RSAPrivateKey rsaPrivateKey = RSAUtil.INSTANCE.readPrivateKey(new File("c:\\Users\\Vity\\vsphereinstaclone\\accounts-pk.pem"));
+//    }
+
     @Test
     public void testReadKey() {
         String key = "-----BEGIN PUBLIC KEY-----\n" +

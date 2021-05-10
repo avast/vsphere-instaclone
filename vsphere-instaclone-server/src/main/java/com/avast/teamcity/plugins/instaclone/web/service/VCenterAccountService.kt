@@ -19,7 +19,6 @@ import jetbrains.buildServer.serverSide.ProjectManager
 import jetbrains.buildServer.serverSide.TeamCityProperties
 import jetbrains.buildServer.web.openapi.PluginDescriptor
 import org.apache.commons.codec.binary.Base64
-import java.nio.file.Files
 import java.nio.file.Paths
 import java.security.PrivateKey
 
@@ -47,12 +46,12 @@ class VCenterAccountService(
         val pkPath = getPrivateKeyPath()
         logger.info("VCenterAccountService - Path for Account Private key is $pkPath")
 
-        if (pkPath != null) {
+        pkPath?.let {
             val file = Paths.get(pkPath)
             val toFile = file.toFile()
             if (toFile.isFile && toFile.exists()) {
                 try {
-                    return RSAUtil.getPrivateKeyPem(Files.readAllBytes(file))
+                    return RSAUtil.getPrivateKeyPem(toFile)
                 } catch (e: Exception) {
                     logger.error("VCenterAccountService - couldn't load Accounts Private Key $file", e)
                     throw RuntimeException(
@@ -63,8 +62,8 @@ class VCenterAccountService(
             }
         }
 
-        logger.error("VCenterAccountService account private key is not defined")
-        throw RuntimeException("VCenterAccountService account private key is not defined")
+        logger.error("VCenterAccountService account private key is not defined on its location")
+        throw RuntimeException("VCenterAccountService account private key is not defined on its location")
     }
 
     private fun getPrivateKeyPath(): String? {
