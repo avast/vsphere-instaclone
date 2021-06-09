@@ -3,9 +3,11 @@
 <%@ taglib prefix="l" tagdir="/WEB-INF/tags/layout" %>
 <%@ taglib prefix="bs" tagdir="/WEB-INF/tags" %>
 <%@ taglib prefix="forms" tagdir="/WEB-INF/tags/forms" %>
-<%@ taglib uri = "http://java.sun.com/jsp/jstl/functions" prefix = "fn" %>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/functions" prefix="fn" %>
 
-<jsp:useBean id="vCenterAccounts" scope="request" type="java.util.Collection<com.avast.teamcity.plugins.instaclone.web.service.profile.VCenterAccount>"/>
+<jsp:useBean id="vCenterAccounts" scope="request"
+             type="java.util.Collection<com.avast.teamcity.plugins.instaclone.web.service.profile.VCenterAccount>"/>
+<jsp:useBean id="accountsException" scope="request" type="java.lang.String"/>
 
 <l:settingsGroup title="VMWare Instaclone profile settings">
     <tr>
@@ -13,47 +15,49 @@
             <label for="vmwareInstacloneVCenterAccount">vCenter Account:</label><l:star/>
         </th>
         <td>
-
             <props:selectProperty name="vmwareInstacloneVCenterAccount" enableFilter="true" className="longField">
                 <c:forEach items="${vCenterAccounts}" var="account">
                     <props:option value="${account.id}">
-                        <c:out value="${account.id} (${account.url})" />
+                        <c:out value="${account.id} (${account.url})"/>
                     </props:option>
                 </c:forEach>
             </props:selectProperty>
+            <span class="error" id="error_accountsException">
+                <c:out value="${accountsException}"/>
+            </span>
             <span class="error" id="error_vmwareInstacloneVCenterAccount"></span>
             <span class="error" id="error_vmwareInstacloneConnectionInfo"></span>
         </td>
     </tr>
-<%--    <tr>--%>
-<%--        <th>--%>
-<%--            <label for="vmwareInstacloneSdkUrl">vCenter SDK URL:</label><l:star/>--%>
-<%--        </th>--%>
-<%--        <td>--%>
+    <%--    <tr>--%>
+    <%--        <th>--%>
+    <%--            <label for="vmwareInstacloneSdkUrl">vCenter SDK URL:</label><l:star/>--%>
+    <%--        </th>--%>
+    <%--        <td>--%>
 
-<%--            <props:textProperty name="vmwareInstacloneSdkUrl" className="longField"/>--%>
-<%--            <span class="error" id="error_vmwareInstacloneSdkUrl"></span>--%>
-<%--            <span class="error" id="error_vmwareInstacloneConnectionInfo"></span>--%>
-<%--        </td>--%>
-<%--    </tr>--%>
-<%--    <tr>--%>
-<%--        <th>--%>
-<%--            <label for="vmwareInstacloneUsername">Username:</label><l:star/>--%>
-<%--        </th>--%>
-<%--        <td>--%>
-<%--            <props:textProperty name="vmwareInstacloneUsername" className="longField"/>--%>
-<%--            <span class="error" id="error_vmwareInstacloneUsername"></span>--%>
-<%--        </td>--%>
-<%--    </tr>--%>
-<%--    <tr>--%>
-<%--        <th>--%>
-<%--            <label for="vmwareInstaclonePassword">Password:</label><l:star/>--%>
-<%--        </th>--%>
-<%--        <td>--%>
-<%--            <props:passwordProperty name="vmwareInstaclonePassword" className="longField"/>--%>
-<%--            <span class="error" id="error_vmwareInstaclonePassword"></span>--%>
-<%--        </td>--%>
-<%--    </tr>--%>
+    <%--            <props:textProperty name="vmwareInstacloneSdkUrl" className="longField"/>--%>
+    <%--            <span class="error" id="error_vmwareInstacloneSdkUrl"></span>--%>
+    <%--            <span class="error" id="error_vmwareInstacloneConnectionInfo"></span>--%>
+    <%--        </td>--%>
+    <%--    </tr>--%>
+    <%--    <tr>--%>
+    <%--        <th>--%>
+    <%--            <label for="vmwareInstacloneUsername">Username:</label><l:star/>--%>
+    <%--        </th>--%>
+    <%--        <td>--%>
+    <%--            <props:textProperty name="vmwareInstacloneUsername" className="longField"/>--%>
+    <%--            <span class="error" id="error_vmwareInstacloneUsername"></span>--%>
+    <%--        </td>--%>
+    <%--    </tr>--%>
+    <%--    <tr>--%>
+    <%--        <th>--%>
+    <%--            <label for="vmwareInstaclonePassword">Password:</label><l:star/>--%>
+    <%--        </th>--%>
+    <%--        <td>--%>
+    <%--            <props:passwordProperty name="vmwareInstaclonePassword" className="longField"/>--%>
+    <%--            <span class="error" id="error_vmwareInstaclonePassword"></span>--%>
+    <%--        </td>--%>
+    <%--    </tr>--%>
     <tr>
         <th>
             <label for="vmwareInstacloneImages">Images:</label><l:star/>

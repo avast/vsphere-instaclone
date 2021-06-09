@@ -18,11 +18,11 @@
     /css/settingsBlock.css
     /css/tags.css
     /css/admin/adminMain.css
-    /plugins/vsphere-instaclone/css/instaProfiles.css
+    /plugins/vsphere-instaclone2/css/instaProfiles.css
 </bs:linkCSS>
 
 <bs:linkScript>
-    /plugins/vsphere-instaclone/js/instaProfiles.js
+    /plugins/vsphere-instaclone2/js/instaProfiles.js
 </bs:linkScript>
 
 <h1>vSphere-Instaclone profiles</h1>

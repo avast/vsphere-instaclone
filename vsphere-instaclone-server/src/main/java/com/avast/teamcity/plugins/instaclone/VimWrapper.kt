@@ -1,6 +1,5 @@
 package com.avast.teamcity.plugins.instaclone
 
-import com.avast.teamcity.plugins.instaclone.utils.PropertyCollectorUtil
 import com.avast.teamcity.plugins.instaclone.web.service.VCenterAccountService
 import com.vmware.vim25.*
 import javax.xml.soap.DetailEntry
@@ -110,46 +109,6 @@ class VimWrapper(
 
             /// missing -> NotAuthenticated
             doLogin(content.missingSet[0].fault.localizedMessage ?: "Not Authenticated")
-        }
-    }
-
-    fun getManagedProperty(obj: ManagedObjectReference, typeinfo: Array<Array<String>>): Any {
-        val filterSpec = PropertyFilterSpec()
-        val objectSpec = ObjectSpec().also {
-            it.obj = obj
-            it.isSkip = false
-            it.selectSet.addAll(PropertyCollectorUtil.buildFullTraversalV4())
-        }
-
-        filterSpec.objectSet.add(objectSpec)
-
-        val propspecary = PropertyCollectorUtil.buildPropertySpecArray(typeinfo)
-
-        filterSpec.propSet.addAll(propspecary)
-
-        while (true) {
-            val retrieveResult = authenticated {
-                port.retrievePropertiesEx(serviceContent.propertyCollector, listOf(filterSpec), RetrieveOptions())
-            }
-//            assert(retrieveResult.objects.size == 1)
-            return retrieveResult
-//            val content = retrieveResult.objects[0]
-//            if (content.missingSet.isEmpty()) {
-//                assert(content.propSet.size == 1)
-//                return content.propSet[0].getVal()
-//            }
-//
-//            for (missing in content.missingSet) {
-//                if (missing.fault.fault !is NotAuthenticated) {
-//                    if (missing.fault.fault is InvalidProperty) {
-//                        throw RuntimeException("Invalid property - error message: ${missing.fault.localizedMessage ?: ""}")
-//                    }
-//                    throw RuntimeException(missing.fault.localizedMessage)
-//                }
-//            }
-
-            /// missing -> NotAuthenticated
-//            doLogin(content.missingSet[0].fault.localizedMessage ?: "Not Authenticated")
         }
     }
 

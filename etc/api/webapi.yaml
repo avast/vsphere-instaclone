@@ -68,6 +68,45 @@ paths:
             type: string
             default: "vmic"
             description: Parameter is used for debug purposes to list another version of VMIC plugin profiles
+  /app/vmic/accounts/list:
+    get:
+      description: List all stored vCenter accounts without usernames and passwords, just IDs and URLs
+      responses:
+        403:
+          description: not enough permissions to perform operation
+        200:
+          $ref: "#/components/responses/listAccountsResponse"
+
+  /app/vmic/accounts/update:
+    post:
+      description: |
+        Update all stored vCenter accounts. Posted data are encrypted with a random unique AES key and the key is encrypted with RSA public key.
+        The private key from the keypair is stored on the TC server to be able to decrypt accounts list when needed.
+        Account id must be unique.
+        Accounts.yaml example:
+        ```yaml
+          #accounts list:
+          accounts:
+            - id: vCenterNewYork
+              url: https://vCenterURL/sdk
+              username: <vCenter SDK username>
+              password: <vCenter SDK password>
+            - id: vCenterPrague
+              url: https://vCenterURL/sdk
+              username: <vCenter SDK username>
+              password: <vCenter SDK password>
+        ```
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/accountsUpdateRequest"
+      responses:
+        403:
+          description: not enough permissions to perform operation
+        200:
+          description: The accounts were updated successfully
+
 components:
   schemas:
     imageConfig:
@@ -86,7 +125,7 @@ components:
           type: integer
           minimum: 1
         agentPool:
-          anyOf:
+          oneOf:
             - type: integer
             - type: string
         network:
@@ -159,7 +198,16 @@ components:
           type: object
           additionalProperties:
             type: string
-
+    accountsUpdateRequest:
+      type: object
+      required: ["accounts", "aes256"]
+      properties:
+        accounts:
+          type: string
+          description: Base64 encrypted value. The encryption is done by symmetric cypher AES (with AES256 key)
+        aes256:
+          type: string
+          description: Base64 encrypted AES256 key value. The key is encrypted by RSA public key.
 
     cloudProfile:
       type: object
@@ -191,9 +239,19 @@ components:
           additionalProperties:
             type: string
 
+    account:
+      type: object
+      required: ["id", "url"]
+      properties:
+        id:
+          type: string
+          description: account id
+        url:
+          type: string
+          description: vCenter server URL
     profileInfo:
       type: object
-      required: [ "projectName", "projectExtId", "profileId", "profileEnabled", "profileParameters", "sdkUrl", "templates" ]
+      required: [ "projectName", "projectExtId", "profileId", "profileEnabled", "profileParameters", "sdkUrl", "templates", "vCenterAccount" ]
       properties:
         projectName:
           type: string
@@ -216,6 +274,9 @@ components:
             type: string
         sdkUrl:
           type: string
+        vCenterAccount:
+          type: string
+          description: id of the account used for connection to vCenter
         templates:
           type: array
           items:
@@ -232,20 +293,30 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/profileInfo"
-  requestBodies:
-    cloudProfileCreateRequestBody:
-      description: cloud profile description for VMIC plugin
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/profileInfo"
-    cloudProfileUpdateRequestBody:
-      description: cloud profile description for VMIC plugin
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/cloudProfileUpdateRequest"
+    accountsList:
+      type: array
+      items:
+        $ref: "#/components/schemas/account"
+#  requestBodies:
+#    cloudProfileCreateRequestBody:
+#      description: cloud profile description for VMIC plugin
+#      content:
+#        application/json:
+#          schema:
+#            $ref: "#/components/schemas/profileInfo"
+#    cloudProfileUpdateRequestBody:
+#      description: cloud profile description for VMIC plugin
+#      content:
+#        application/json:
+#          schema:
+#            $ref: "#/components/schemas/cloudProfileUpdateRequest"
   responses:
+    listAccountsResponse:
+      description: profile info with image parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/accountsList"
     profileInfoResponse:
       description: profile info with image parameters
       content:

@@ -1,10 +1,16 @@
 package com.avast.teamcity.plugins.instaclone
 
 import com.vmware.vim25.*
-import jetbrains.buildServer.clouds.*
+import jetbrains.buildServer.clouds.CloudErrorInfo
+import jetbrains.buildServer.clouds.CloudInstance
+import jetbrains.buildServer.clouds.CloudInstanceUserData
+import jetbrains.buildServer.clouds.InstanceStatus
 import jetbrains.buildServer.serverSide.AgentDescription
 import jetbrains.buildServer.serverSide.BuildAgentEx
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.util.*
 
@@ -83,6 +89,7 @@ class ICCloudInstance(
             put("guestinfo.teamcity-instance-uuid", uuid)
             put("guestinfo.teamcity-profile-uuid", profile.uuid)
             put("guestinfo.teamcity-instance-config", data.toString())
+            put("guestinfo.guest.hostname", name)
         }
 
         val devices = profile.vim.getProperty(image.template, "config.hardware.device") as ArrayOfVirtualDevice

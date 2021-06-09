@@ -21,7 +21,7 @@ jobs:
     - uses: actions/upload-artifact@v2
       with:
         name: bin
-        path: target/vsphere-instaclone.zip
+        path: target/vsphere-instaclone2.zip
     outputs:
       version: ${{ steps.version.outputs.version }}
 
@@ -43,6 +43,6 @@ jobs:
     - uses: actions/upload-release-asset@v1.0.2
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./vsphere-instaclone.zip
-        asset_name: vsphere-instaclone.zip
+        asset_path: ./vsphere-instaclone2.zip
+        asset_name: vsphere-instaclone2.zip
         asset_content_type: application/zip

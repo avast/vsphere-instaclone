@@ -98,8 +98,39 @@ from the server, but before the machine is deleted.
 This is an ideal place to release the machine's IP address, for example.
 
 ## REST API
-This plugin extends standard TC REST api to be able to list, create, update, remove VSphere instaclone profiles. 
+
+### Profiles CRUD
+This plugin extends TC REST API to be able to list, create, update, remove VSphere instaclone profiles. 
 [The extended API is described using Swagger aka OpenAPI v3](/etc/api/webapi.yaml).
 
-Additionaly there is a new "flat" view for profiles used defined by this plugin - `http://<teamcityurl>/vmic.html`. 
+### VSphere Accounts 
+Accounts are defined centrally and every cloud profile is linked with an account ID.    
+To set up list of available accounts you need to use [REST API call - /app/vmic/accounts/](/etc/api/webapi.yaml).
+Posted data are encrypted with a random unique AES key, and the key is encrypted with RSA public key.
+The private key from the keypair is physically stored on the TC server to be able to decrypt accounts list when needed. The keys should be saved in the PEM format. 
+
+Account id must be unique.
+
+Cloud profile without proper defined account id is rejected.
+
+#### Creating RSA Keypair using OpenSSL
+```bash
+# generate a private key with the correct length
+openssl genrsa -out accounts-pk.pem 2048
+```
+
+```bash
+# generate corresponding public key
+openssl rsa -in accounts-pk.pem -pubout -out public-key.pem
+```
+
+#### Account Private key location
+The key should be placed at one of this location (ordered by higher priority): 
+- `accountsPkPath` parameter in the plugin descriptor `teamcity-plugin.xml` 
+- TC property `teamcity.vsphereinstaclone.accountsPkPath`
+- file `${userHome}/vsphereinstaclone/accounts-pk.pem`
+
+
+## Extended UI
+There is a new "flat" view for profiles used defined by this plugin - `http://<teamcityurl>/vmic.html`. 
 It's necessary to TC `MANAGE_AGENT_CLOUDS` permission.

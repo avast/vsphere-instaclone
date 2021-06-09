@@ -79,7 +79,7 @@
                             <goal>single</goal>
                         </goals>
                         <configuration>
-                            <finalName>vsphere-instaclone</finalName>
+                            <finalName>vsphere-instaclone2</finalName>
                             <outputDirectory>${project.parent.build.directory}</outputDirectory>
                             <appendAssemblyId>false</appendAssemblyId>
                             <descriptors>
