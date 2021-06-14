@@ -1,10 +1,16 @@
 package com.avast.teamcity.plugins.instaclone
 
 import com.vmware.vim25.*
-import jetbrains.buildServer.clouds.*
+import jetbrains.buildServer.clouds.CloudErrorInfo
+import jetbrains.buildServer.clouds.CloudInstance
+import jetbrains.buildServer.clouds.CloudInstanceUserData
+import jetbrains.buildServer.clouds.InstanceStatus
 import jetbrains.buildServer.serverSide.AgentDescription
 import jetbrains.buildServer.serverSide.BuildAgentEx
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.util.*
 
@@ -65,7 +71,7 @@ class ICCloudInstance(
     }
 
     private suspend fun powerOn(name: String, userData: CloudInstanceUserData): ManagedObjectReference {
-        val extraConfig = HashMap<String, String>().apply {
+        val extraConfig = mutableMapOf<String, String>().apply {
             val data = JSONObject().apply {
                 val agentName = userData.agentName
                 put("agentName", if (agentName.isEmpty()) name else agentName)
@@ -83,6 +89,7 @@ class ICCloudInstance(
             put("guestinfo.teamcity-instance-uuid", uuid)
             put("guestinfo.teamcity-profile-uuid", profile.uuid)
             put("guestinfo.teamcity-instance-config", data.toString())
+            put("guestinfo.guest.hostname", name)
         }
 
         val devices = profile.vim.getProperty(image.template, "config.hardware.device") as ArrayOfVirtualDevice
@@ -94,7 +101,13 @@ class ICCloudInstance(
                 this.location = VirtualMachineRelocateSpec().apply {
                     folder = image.instanceFolder
 
+                    if (image.resourcePool != null) {
+                        pool = image.resourcePool
+                    }
+
+                    // network to which the cloned machine's ethernet card should be connected
                     for ((networkName, ethernetDevice) in image.networks.zip(ethernetDevices)) {
+
                         val netMor = vim.authenticated {
                             it.findByInventoryPath(vim.serviceContent.searchIndex, networkName)
                         }
@@ -226,6 +239,10 @@ class ICCloudInstance(
         }
     }
 
+    override fun toString(): String {
+        return "ICCloudInstance(uuid='$uuid', name='$name', status=$status)"
+    }
+
 
     private var status: InstanceStatus = InstanceStatus.UNKNOWN
     private var errorInfo: CloudErrorInfo? = null
@@ -264,6 +281,9 @@ class ICCloudInstance(
             }
         }
 
+        /**
+         * Find existing running instance/machine to be shown in the TC UI (eg. after TC restart)
+         */
         fun createRunning(vim: VimWrapper, uuid: String, name: String, image: ICCloudImage, vm: ManagedObjectReference): ICCloudInstance {
             val startTime =
                 vim.getProperty(vm, "config.extraConfig[\"guestinfo.teamcity-instance-startTime\"].value") as String
@@ -275,6 +295,8 @@ class ICCloudInstance(
             }
         }
     }
+
+
 }
 
 class LocalizedMethodFaultException(val fault: LocalizedMethodFault): RuntimeException(fault.localizedMessage)

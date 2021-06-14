@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <teamcity-plugin xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:schemas-jetbrains-com:teamcity-plugin-v1-xml">
   <info>
-    <name>vsphere-instaclone</name>
-    <display-name>vSphere InstaClone Cloud Provider</display-name>
+    <name>vsphere-instaclone2</name>
+    <display-name>vSphere InstaClone Cloud Provider2</display-name>
     <version>@Version@</version>
     <description>Really quickly clone machines to be used as TeamCity agents</description>
     <email>martin.vejnar@avast.com</email>

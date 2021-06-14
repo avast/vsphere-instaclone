@@ -1,0 +1,9 @@
+table.parametersTable td.editable {
+    padding-left: 0.5em;
+    padding-right: 0.5em;
+    width: 4%;
+}
+table.parametersTable ul.listable {
+    margin-top: 0;
+    margin-bottom: 0;
+}
