@@ -49,7 +49,6 @@ class ICProfileController(
                 override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView? {
                     return if (isPost(request)) {
                         jsonRequestResponse(request, CloudProfileUpdateRequest::class, response) {
-                            checkManageCloudPermission()
                             checkProjectEditPermission(it!!.extProjectId)
 
                             val profile = cloudProfilesService.updateProfile(
@@ -73,7 +72,6 @@ class ICProfileController(
                     return if (isPost(request)) {
                         jsonRequestResponse(request, CloudProfileCreateRequest::class, response) {
 
-                            checkManageCloudPermission()
                             checkProjectEditPermission(it!!.extProjectId)
 
                             val profile = cloudProfilesService.createProfile(it)
@@ -92,7 +90,6 @@ class ICProfileController(
                 override fun doHandle(request: HttpServletRequest, response: HttpServletResponse): ModelAndView? {
                     return if (isPost(request)) {
                         jsonRequestResponse(request, CloudProfileRemoveRequest::class, response) {
-                            checkManageCloudPermission()
                             checkProjectEditPermission(it!!.extProjectId)
 
                             cloudProfilesService.removeProfile(it)

@@ -27,9 +27,10 @@ abstract class BaseJsonController(
     private val logger = Logger.getInstance(BaseJsonController::class.java.name)
 
     fun checkProjectEditPermission(projectId: String) {
-        if (!AuthUtil.hasPermissionToManageProject(
+        if (!AuthUtil.hasProjectPermission(
                 securityContext.authorityHolder,
-                translateProjectId(projectId)
+                translateProjectId(projectId),
+                Permission.MANAGE_AGENT_CLOUDS
             )
         ) {
             throw IllegalAccessException("User has not edit permissions to access project with id $projectId")
@@ -37,8 +38,8 @@ abstract class BaseJsonController(
     }
 
     fun checkManageCloudPermission() {
-        if (!AuthUtil.hasGlobalPermission(
-                securityContext.authorityHolder, Permission.MANAGE_AGENT_CLOUDS
+        if (!AuthUtil.hasProjectPermission(
+                securityContext.authorityHolder, projectManager.rootProject.projectId, Permission.MANAGE_AGENT_CLOUDS
             )
         ) {
             throw IllegalAccessException("User has not permissions to edit cloud profiles")
