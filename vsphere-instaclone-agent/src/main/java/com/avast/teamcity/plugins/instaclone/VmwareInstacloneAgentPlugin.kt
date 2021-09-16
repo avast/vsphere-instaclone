@@ -1,20 +1,20 @@
 package com.avast.teamcity.plugins.instaclone
 
 import com.intellij.openapi.diagnostic.Logger
-import jdk.internal.agent.resources.agent
 import jetbrains.buildServer.agent.AgentLifeCycleAdapter
 import jetbrains.buildServer.agent.AgentLifeCycleListener
 import jetbrains.buildServer.agent.BuildAgent
 import jetbrains.buildServer.util.EventDispatcher
 
 class VmwareInstacloneAgentPlugin(
-        lifeCycleEvents: EventDispatcher<AgentLifeCycleListener>) {
+    lifeCycleEvents: EventDispatcher<AgentLifeCycleListener>
+) {
     private val logger = Logger.getInstance(VmwareInstacloneAgentPlugin::class.java.name)
 
     init {
         lifeCycleEvents.addListener(object : AgentLifeCycleAdapter() {
             override fun pluginsLoaded() {
-                logger.info("VmwareInstacloneAgentPlugin - plugins loaded " + agent.id)
+                logger.info("VmwareInstacloneAgentPlugin - plugins loaded ")
             }
 
             override fun beforeAgentConfigurationLoaded(agent: BuildAgent) {
