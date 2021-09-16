@@ -10,6 +10,7 @@ class ICImageConfig(
     val template: String?,
     val instanceFolder: String?,
     val resourcePool: String?,
+    val datastore: String?,
     val maxInstances: Int = Integer.MAX_VALUE,
     val agentPool: Any?,
     @JsonFormat(with = [JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY])

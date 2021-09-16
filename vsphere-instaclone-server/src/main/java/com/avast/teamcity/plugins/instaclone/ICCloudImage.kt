@@ -10,16 +10,18 @@ import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
 class ICCloudImage(
-        private val id: String,
-        private val name: String,
-        val template: ManagedObjectReference,
-        val instanceFolder: ManagedObjectReference,
-        val resourcePool: ManagedObjectReference?,
-        val maxInstances: Int,
-        val networks: List<String>,
-        val shutdownTimeout: Duration,
-        private val agentPool: Int?,
-        val profile: ICCloudClient) : CloudImage {
+    private val id: String,
+    private val name: String,
+    val instanceFolder: ManagedObjectReference,
+    val resourcePool: ManagedObjectReference?,
+    val datastore: ManagedObjectReference?,
+    val maxInstances: Int,
+    val networks: List<String>,
+    val shutdownTimeout: Duration,
+    private val agentPool: Int?,
+    val profile: ICCloudClient,
+    val imageTemplate: String
+) : CloudImage {
 
     private var instanceCounter = 0
     // key = instance uuid

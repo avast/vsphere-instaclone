@@ -121,6 +121,8 @@ components:
           type: string
         resourcePool:
           type: string
+        datastore:
+          type: string
         maxInstances:
           type: integer
           minimum: 1

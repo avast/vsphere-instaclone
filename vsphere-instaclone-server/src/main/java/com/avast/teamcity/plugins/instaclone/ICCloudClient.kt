@@ -1,7 +1,6 @@
 package com.avast.teamcity.plugins.instaclone
 
 import com.intellij.openapi.diagnostic.Logger
-import com.vmware.vim25.ArrayOfManagedObjectReference
 import com.vmware.vim25.ArrayOfOptionValue
 import com.vmware.vim25.ManagedObjectReference
 import jetbrains.buildServer.clouds.*
@@ -9,10 +8,12 @@ import jetbrains.buildServer.serverSide.AgentDescription
 import jetbrains.buildServer.serverSide.BuildAgentManager
 import jetbrains.buildServer.serverSide.agentPools.AgentPoolManager
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
 import java.time.Duration
 import java.util.concurrent.Executors
-
+import kotlin.coroutines.ContinuationInterceptor
+import kotlin.coroutines.CoroutineContext
 
 
 private val terminalStates = arrayOf(InstanceStatus.ERROR, InstanceStatus.ERROR_CANNOT_STOP, InstanceStatus.STOPPED)
@@ -26,13 +27,14 @@ class ICCloudClient(
 ) : CloudClientEx {
 
     val coroScope = CoroutineScope(Executors.newSingleThreadExecutor().asCoroutineDispatcher())
+    val coroScopeClone = CoroutineScope(Executors.newCachedThreadPool().asCoroutineDispatcher())
 
     private fun setupImage(image: ICCloudImage) {
-        logger.info("Searching for existing running instances for image: id=${image.id} and name = ${image.name}")
+        logger.info("Searching for existing running instances for image: id=${image.id} and template name = ${image.imageTemplate}")
 
-        val children = vim.getProperty(image.instanceFolder, "childEntity") as ArrayOfManagedObjectReference
+        val virtualMachines = vim.getFolderVirtualMachines(image.instanceFolder)
 
-        val virtualMachines = children.managedObjectReference.filter { mof -> mof.type == "VirtualMachine" }
+        logger.info("Find and create running cloud instance for image: id=${image.id} and image template name = ${image.imageTemplate}")
 
         val existingInstances = virtualMachines.mapNotNull { vmMor ->
 
@@ -53,14 +55,13 @@ class ICCloudClient(
         extraConfig: ArrayOfOptionValue,
         image: ICCloudImage
     ): ICCloudInstance? {
-        logger.info("Find and create running cloud instance for image: id=${image.id} and name = ${image.name}")
         val instanceUuid = extraConfig.optionValue.firstOrNull { it.key == "guestinfo.teamcity-instance-uuid" }
             ?.let { it.value as String? }
 
         return instanceUuid?.let { _ ->
             extraConfig.optionValue.firstOrNull { it.key == "guestinfo.teamcity-profile-uuid" && it.value == this.uuid }
         }?.let {
-            val instanceName = vim.getProperty(vmMor, "name") as String
+            val instanceName = vim.getNameProperty(vmMor)
 
             image.createRunningInstance(vim, instanceUuid, instanceName, vmMor)
         }
@@ -91,6 +92,18 @@ class ICCloudClient(
     override fun dispose() {
         super.dispose()
         logger.info("Disposing cloud instance")
+        try {
+            logger.info("Shutting down coroutine contexts - coroScope")
+            coroScope.coroutineContext.asExecutor().close()
+        } catch (e: Exception) {
+            logger.error(e)
+        }
+        try {
+            logger.info("Shutting down coroutine contexts - coroScopeClone")
+            coroScopeClone.coroutineContext.asExecutor().close()
+        } catch (e: Exception) {
+            logger.error(e)
+        }
     }
 
     @Throws(CloudException::class)
@@ -150,11 +163,13 @@ class ICCloudClient(
 
             val imageInstanceFolder = imageConfig.instanceFolder ?: imageTemplate.substring(0, sepIndex)
 
-            val vm = vim.authenticated { vimPortType ->
-                vimPortType.findByInventoryPath(vim.serviceContent.searchIndex, imageTemplate)
+            if (!imageTemplate.endsWith(ICCloudInstance.MULTIPLE_VALUE_SEPARATOR)) {
+                val vm = vim.authenticated { vimPortType ->
+                    vimPortType.findByInventoryPath(vim.serviceContent.searchIndex, imageTemplate)
+                }
+                if (vm == null || vm.type != VimWrapper.VM_TYPE)
+                    throw RuntimeException("Not a VM: $imageTemplate")
             }
-            if (vm == null || vm.type != "VirtualMachine")
-                throw RuntimeException("Not a VM: $imageTemplate")
 
             val folder = vim.authenticated { vimPortType ->
                 vimPortType.findByInventoryPath(vim.serviceContent.searchIndex, imageInstanceFolder)
@@ -163,7 +178,7 @@ class ICCloudClient(
             if (folder == null || folder.type != "Folder")
                 throw RuntimeException("Not a folder: $imageInstanceFolder")
 
-            val resourcePool = imageConfig.resourcePool?.let {resourcePool ->
+            val resourcePool = imageConfig.resourcePool?.let { resourcePool ->
                 vim.authenticated { vimPortType ->
                     vimPortType.findByInventoryPath(vim.serviceContent.searchIndex, resourcePool)
                 }
@@ -171,6 +186,16 @@ class ICCloudClient(
 
             if ((resourcePool == null || resourcePool.type != "ResourcePool") && imageConfig.resourcePool != null) {
                 throw RuntimeException("ResourcePool not found: ${imageConfig.resourcePool}")
+            }
+
+            val datastore = imageConfig.resourcePool?.let { datastore ->
+                vim.authenticated { vimPortType ->
+                    vimPortType.findByInventoryPath(vim.serviceContent.searchIndex, datastore)
+                }
+            }
+
+            if ((datastore == null || datastore.type != "Datastore") && imageConfig.datastore != null) {
+                throw RuntimeException("DataStore not found: ${imageConfig.datastore}")
             }
 
             val agentPool = when (val value = imageConfig.agentPool) {
@@ -183,10 +208,13 @@ class ICCloudClient(
             val shutdownTimeout = Duration.ofSeconds(imageConfig.shutdownTimeout)
 
             val imageObject = ICCloudImage(
-                imageName, imageName, vm, folder, resourcePool, maxInstances,
-                imageConfig.network, shutdownTimeout, agentPool, this
+                imageName, imageName, folder, resourcePool, datastore, maxInstances,
+                imageConfig.network, shutdownTimeout, agentPool, this, imageTemplate
             )
             setupImage(imageObject)
         }
     }
+
+    private fun CoroutineContext.asExecutor(): ExecutorCoroutineDispatcher =
+        (get(ContinuationInterceptor) as ExecutorCoroutineDispatcher)
 }

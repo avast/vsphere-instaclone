@@ -73,6 +73,10 @@ class VimWrapper(
         }
     }
 
+    fun getNameProperty(obj: ManagedObjectReference): String {
+        return this.getProperty(obj, "name") as String
+    }
+
     fun getProperty(obj: ManagedObjectReference, name: String): Any {
         val filterSpec = PropertyFilterSpec()
         val objectSpec = ObjectSpec().also {
@@ -117,8 +121,15 @@ class VimWrapper(
     }
 
 
+    fun getFolderVirtualMachines(instanceFolder: ManagedObjectReference): List<ManagedObjectReference> {
+        val children = getProperty(instanceFolder, "childEntity") as ArrayOfManagedObjectReference
+
+        return children.managedObjectReference.filter { mof -> mof.type == VM_TYPE }
+    }
+
 
     companion object {
+        const val VM_TYPE = "VirtualMachine"
         val serviceInstance = ManagedObjectReference().apply {
             type = "ServiceInstance"
             value = "ServiceInstance"
