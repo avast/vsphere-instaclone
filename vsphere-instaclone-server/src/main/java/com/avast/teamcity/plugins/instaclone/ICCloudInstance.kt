@@ -344,7 +344,7 @@ class ICCloudInstance(
         return "ICCloudInstance(uuid='$uuid', name='$name', status=$status)"
     }
 
-    fun createClone(templateNameSuffix: String, buildLog: BuildLog): Job? {
+    fun createClone(templateNameSuffix: String, buildLog: BuildLog, cloneNumberLimit: Int?): Job? {
         if (vm == null) {
             logger.warn("Cannot create instaClone, instance '$name' has not vm reference available")
             return null
@@ -359,7 +359,7 @@ class ICCloudInstance(
 
         val job = profile.coroScopeClone.launch {
             try {
-                doClone(templateNameSuffix, buildLog)
+                doClone(templateNameSuffix, buildLog, cloneNumberLimit)
             } catch (e: Throwable) {
                 logger.error("Failed to doClone", e)
                 throw CancellationException("Failed to doClone", e)
@@ -370,7 +370,7 @@ class ICCloudInstance(
 //        }
     }
 
-    private suspend fun doClone(templateNameSuffix: String, buildLog: BuildLog) {
+    private suspend fun doClone(templateNameSuffix: String, buildLog: BuildLog, cloneNumberLimit: Int?) {
         val templateNameSepSuffix =
             if (templateNameSuffix.isNotEmpty() && !templateNameSuffix.startsWith(TEMPLATENAME_SUFFIX_SEPARATOR)) {
                 "$TEMPLATENAME_SUFFIX_SEPARATOR$templateNameSuffix"
@@ -434,7 +434,7 @@ class ICCloudInstance(
 
         try {
             buildLog.info("Searching and destroying old virtual machines")
-            searchCleanAndDestroyVM(image.name, templateNameSepSuffix, buildLog)
+            searchCleanAndDestroyVM(image.name, templateNameSepSuffix, buildLog, cloneNumberLimit)
         } catch (e: Exception) {
             logger.error("Unexpected error during Search&Destroy existing VM", e)
             throw e
@@ -506,11 +506,12 @@ class ICCloudInstance(
     private suspend fun searchCleanAndDestroyVM(
         coreImageTemplateName: String,
         templateNameSuffix: String,
-        buildLog: BuildLog
+        buildLog: BuildLog,
+        cloneNumberLimit: Int?
     ) {
         logger.info("Searching for existing VM virtual machines")
         val vms = getMultipleVMFrozenImages(coreImageTemplateName, templateNameSuffix).sortedByDescending { it.cloneNumber }
-            .drop(LEAVE_MULTIPLE_IMAGES_COUNT)
+            .drop(cloneNumberLimit ?: LEAVE_MULTIPLE_IMAGES_COUNT)
 
         val ident = "$name/${image.imageTemplate}"
         vms.forEach { vm ->
@@ -550,7 +551,7 @@ class ICCloudInstance(
             "guestinfo.guest.hostname"
         )
         private val DELAY_RESTART_DURATION = Duration.ofMinutes(1)
-        private const val LEAVE_MULTIPLE_IMAGES_COUNT = 2
+        internal const val LEAVE_MULTIPLE_IMAGES_COUNT = 2
         private const val INITIAL_FREEZE_DELAY_MS = 20000L
         private const val MAX_FREEZE_DELAY_ADDITIONAL_TIMEOUT_SEC = 80
 

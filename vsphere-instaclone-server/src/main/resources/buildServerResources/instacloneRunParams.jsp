@@ -22,6 +22,18 @@
     </tr>
     <tr>
         <th>
+            <label for="cloneNumberLimit">Clone number limit: <l:star/></label>
+        </th>
+        <td>
+            <div class="postRel">
+                <props:textProperty name="cloneNumberLimit" className="smallField" maxlength="7"/>
+            </div>
+            <span class="smallNote">How many older clones should be preserved. Min value is 1.</span>
+            <span class="error" id="error_cloneNumberLimit"></span>
+        </td>
+    </tr>
+    <tr>
+        <th>
             <label for="templateTimeout">Clone generation timeout (seconds): <l:star/></label>
         </th>
         <td>

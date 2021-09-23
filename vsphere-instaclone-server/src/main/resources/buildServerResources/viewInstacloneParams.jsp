@@ -10,5 +10,8 @@
     Template name suffix: <props:displayValue name="templateNameSuffix" emptyValue="" showInPopup="false" popupTitle="Template name suffix" popupLinkText="view template name suffix"/>
 </div>
 <div class="parameter">
+    Clone number limit: <props:displayValue name="cloneNumberLimit" emptyValue="" showInPopup="false" popupTitle="Clone number limit" popupLinkText="view clone number limit"/>
+</div>
+<div class="parameter">
     Timeout: <props:displayValue name="templateTimeout" emptyValue="" showInPopup="false" popupTitle="Template timeout" popupLinkText="view template timeout"/>
 </div>

@@ -14,7 +14,7 @@ class VmwareInstacloneAgentPlugin(
     init {
         lifeCycleEvents.addListener(object : AgentLifeCycleAdapter() {
             override fun pluginsLoaded() {
-                logger.info("VmwareInstacloneAgentPlugin - plugins loaded ")
+                logger.info("VmwareInstacloneAgentPlugin - plugins loaded")
             }
 
             override fun beforeAgentConfigurationLoaded(agent: BuildAgent) {

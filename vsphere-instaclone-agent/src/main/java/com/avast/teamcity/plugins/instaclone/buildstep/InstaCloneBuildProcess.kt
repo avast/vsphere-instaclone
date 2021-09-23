@@ -93,14 +93,15 @@ class InstaCloneBuildProcess(
 
     override fun call(): BuildFinishedStatus {
         try {
-            val templateNameSuffix = context.runnerParameters[TEMPLATE_NAME_SUFFIX_PARAMETER_NAME]
+            val templateNameSuffix = context.runnerParameters[TEMPLATE_NAME_SUFFIX_PARAMETER_NAME] ?: ""
+            val cloneNumber = context.runnerParameters[CLONE_NUMBER_LIMIT_PARAMETER_NAME] ?: CLONE_NUMBER_LIMIT_DEFAULT
 
             logger.info("TemplateName suffix value $templateNameSuffix")
-            agent.buildLogger.message("Running InstacloneBuildProcess... with $TEMPLATE_NAME_SUFFIX_PARAMETER_NAME=$templateNameSuffix")
+            agent.buildLogger.message("Running InstacloneBuildProcess... with $TEMPLATE_NAME_SUFFIX_PARAMETER_NAME=$templateNameSuffix and $CLONE_NUMBER_LIMIT_PARAMETER_NAME=$cloneNumber")
             agent.buildLogger.flush()
 
             val serviceMessage =
-                "##teamcity[$MESSAGE_NAME $TEMPLATE_NAME_SUFFIX_PARAMETER_NAME='$templateNameSuffix' uuid='$uuid']"
+                "##teamcity[$MESSAGE_NAME $TEMPLATE_NAME_SUFFIX_PARAMETER_NAME='$templateNameSuffix' uuid='$uuid' $CLONE_NUMBER_LIMIT_PARAMETER_NAME='$cloneNumber']"
             agent.buildLogger.message(serviceMessage)
             agent.buildLogger.flush()
 //            agent.buildLogger.message("Going to sleep for few minutes, after that -> success + continue")
@@ -148,7 +149,9 @@ class InstaCloneBuildProcess(
         const val MESSAGE_NAME = "createVCenterInstaClone"
         const val TEMPLATE_NAME_SUFFIX_PARAMETER_NAME = "templateNameSuffix"
         const val TEMPLATE_TIMEOUT_PARAMETER_NAME = "templateTimeout"
+        const val CLONE_NUMBER_LIMIT_PARAMETER_NAME = "cloneNumberLimit"
         const val DEFAULT_MINUTES_TIMEOUT = 3L
+        const val CLONE_NUMBER_LIMIT_DEFAULT = 2L
     }
 
 }

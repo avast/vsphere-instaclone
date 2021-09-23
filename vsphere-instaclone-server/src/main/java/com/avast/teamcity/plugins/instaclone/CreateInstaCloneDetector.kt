@@ -25,6 +25,7 @@ class CreateInstaCloneDetector(
     companion object {
         const val MESSAGE_NAME = "createVCenterInstaClone"
         const val TEMPLATE_NAME_SUFFIX_PARAMETER_NAME = "templateNameSuffix"
+        const val CLONE_NUMBER_LIMIT_PARAMETER_NAME = "cloneNumberLimit"
     }
 
     override fun translate(
@@ -59,9 +60,9 @@ class CreateInstaCloneDetector(
 
             val templateName = serviceMessage.attributes[TEMPLATE_NAME_SUFFIX_PARAMETER_NAME]
                 ?: throw RuntimeException("Template name parameter $TEMPLATE_NAME_SUFFIX_PARAMETER_NAME cannot be null")
-
+            val cloneNumberLimit = serviceMessage.attributes[CLONE_NUMBER_LIMIT_PARAMETER_NAME]
             val createCloneJob = try {
-                instance.createClone(templateName, build.buildLog)
+                instance.createClone(templateName, build.buildLog, cloneNumberLimit?.toInt())
             } catch (e: Exception) {
                 logger.error(e)
                 output.add(

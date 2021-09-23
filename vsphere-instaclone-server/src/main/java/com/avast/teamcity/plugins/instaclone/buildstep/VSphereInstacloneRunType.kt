@@ -1,5 +1,6 @@
 package com.avast.teamcity.plugins.instaclone.buildstep
 
+import com.avast.teamcity.plugins.instaclone.ICCloudInstance
 import jetbrains.buildServer.serverSide.InvalidProperty
 import jetbrains.buildServer.serverSide.PropertiesProcessor
 import jetbrains.buildServer.serverSide.RunType
@@ -54,6 +55,33 @@ class VSphereInstacloneRunType(descriptor: PluginDescriptor, registry: RunTypeRe
                 )
             }
 
+            map[CLONE_NUMBER_LIMIT_PARAMETER_NAME]?.let { value ->
+                val isValidNumber = value.matches("^[0-9]{1,7}+$".toRegex())
+                if (!isValidNumber) {
+                    result.add(
+                        InvalidProperty(
+                            CLONE_NUMBER_LIMIT_PARAMETER_NAME,
+                            "Invalid value. Not a valid number"
+                        )
+                    )
+                }
+                if (isValidNumber && value.toLong() < 1) {
+                    result.add(
+                        InvalidProperty(
+                            CLONE_NUMBER_LIMIT_PARAMETER_NAME,
+                            "Value must be >= 1"
+                        )
+                    )
+                }
+            } ?: run {
+                result.add(
+                    InvalidProperty(
+                        CLONE_NUMBER_LIMIT_PARAMETER_NAME,
+                        "Value is not defined"
+                    )
+                )
+            }
+
             return@PropertiesProcessor result
         }
     }
@@ -69,7 +97,8 @@ class VSphereInstacloneRunType(descriptor: PluginDescriptor, registry: RunTypeRe
     override fun getDefaultRunnerProperties(): Map<String, String> {
         return mapOf(
             TEMPLATE_NAME_SUFFIX_PARAMETER_NAME to "",
-            TEMPLATE_TIMEOUT_PARAMETER_NAME to Duration.ofMinutes(DEFAULT_TIMEOUT_MINUTES).toSeconds().toString()
+            TEMPLATE_TIMEOUT_PARAMETER_NAME to Duration.ofMinutes(DEFAULT_TIMEOUT_MINUTES).toSeconds().toString(),
+            CLONE_NUMBER_LIMIT_PARAMETER_NAME to ICCloudInstance.LEAVE_MULTIPLE_IMAGES_COUNT.toString()
         )
     }
 
@@ -81,6 +110,8 @@ class VSphereInstacloneRunType(descriptor: PluginDescriptor, registry: RunTypeRe
     companion object {
         const val TEMPLATE_NAME_SUFFIX_PARAMETER_NAME = "templateNameSuffix"
         const val TEMPLATE_TIMEOUT_PARAMETER_NAME = "templateTimeout"
+        const val CLONE_NUMBER_LIMIT_PARAMETER_NAME = "cloneNumberLimit"
+
         const val VSPHERE_INSTACLONE_RUNTYPE = "VSphere Instaclone"
         const val DEFAULT_TIMEOUT_MINUTES = 3L
     }
