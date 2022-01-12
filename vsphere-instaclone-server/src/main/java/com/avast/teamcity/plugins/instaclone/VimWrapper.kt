@@ -98,7 +98,9 @@ class VimWrapper(
 
             val content = retrieveResult.objects[0]
             if (content.missingSet.isEmpty()) {
-                assert(content.propSet.size == 1)
+                if (content.propSet.size != 1) {
+                    throw RuntimeException("Property $name is not in missing set, but its value is not defined")
+                }
                 return content.propSet[0].getVal()
             }
 

@@ -38,7 +38,12 @@ class ICCloudClient(
 
         val existingInstances = virtualMachines.mapNotNull { vmMor ->
 
-            val extraConfig = vim.getProperty(vmMor, "config.extraConfig") as ArrayOfOptionValue
+            val extraConfig = try {
+                vim.getProperty(vmMor, "config.extraConfig") as ArrayOfOptionValue
+            } catch (e: Exception) {
+                logger.error("Failed to extract property `config.extraConfig` from the VM $vmMor", e)
+                return@mapNotNull null
+            }
 
             findAndCreateRunningInstance(vmMor, extraConfig, image)
         }

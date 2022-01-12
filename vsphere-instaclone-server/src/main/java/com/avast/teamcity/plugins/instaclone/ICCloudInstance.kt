@@ -279,6 +279,7 @@ class ICCloudInstance(
         val agent = matchedAgentId?.let {
             profile.buildAgentManager.findAgentById<BuildAgentEx>(it, false)
         }
+
         logger.info("Cloud agent is terminating")
         agent?.setEnabled(false, null, "Cloud agent is terminating")
 
