@@ -193,7 +193,7 @@ class ICCloudClient(
                 throw RuntimeException("ResourcePool not found: ${imageConfig.resourcePool}")
             }
 
-            val datastore = imageConfig.resourcePool?.let { datastore ->
+            val datastore = imageConfig.datastore?.let { datastore ->
                 vim.authenticated { vimPortType ->
                     vimPortType.findByInventoryPath(vim.serviceContent.searchIndex, datastore)
                 }
