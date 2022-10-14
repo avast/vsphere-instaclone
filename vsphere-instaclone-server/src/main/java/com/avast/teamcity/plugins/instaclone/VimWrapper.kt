@@ -1,15 +1,16 @@
 package com.avast.teamcity.plugins.instaclone
 
+import com.avast.teamcity.plugins.instaclone.web.service.VCenterAccountService
 import com.vmware.vim25.*
-import java.lang.Exception
 import javax.xml.soap.DetailEntry
 import javax.xml.ws.soap.SOAPFaultException
 
 class VimWrapper(
-        private val port: VimPortType,
-        private val username: String,
-        private val password: String,
-        private val pluginClassLoader: ClassLoader) {
+    private val port: VimPortType,
+    private val vCenterAccountId: String,
+    private val accountService: VCenterAccountService,
+    private val pluginClassLoader: ClassLoader
+) {
 
     val serviceContent: ServiceContent = port.retrieveServiceContent(serviceInstance)
 
@@ -17,8 +18,9 @@ class VimWrapper(
 
     private fun doLogin(faultMessage: String) {
         pluginClassLoader.inContext {
+            val account = accountService.getAccountById(vCenterAccountId)!!
             val sessionActive = sessionId != "" && try {
-                port.sessionIsActive(serviceContent.sessionManager, sessionId, username)
+                port.sessionIsActive(serviceContent.sessionManager, sessionId, account.username)
             } catch (e: Exception) {
                 false
             }
@@ -27,17 +29,34 @@ class VimWrapper(
                 throw RuntimeException(faultMessage)
             }
 
-            sessionId = port.login(serviceContent.sessionManager, username, password, null).key
+            val userSession = port.login(serviceContent.sessionManager, account.username, account.password, null)
+            sessionId = userSession.key
         }
     }
 
-    fun<T> unauthenticated(block: (port: VimPortType) -> T): T {
+    fun <T> unauthenticated(block: (port: VimPortType) -> T): T {
         return pluginClassLoader.inContext {
             block(port)
         }
     }
 
-    fun<T> authenticated(block: (port: VimPortType) -> T): T {
+    fun connectionLoginTest() {
+        return try {
+            val account = accountService.getAccountById(vCenterAccountId)!!
+            port.login(serviceContent.sessionManager, account.username, account.password, null)
+            val property = getProperty(serviceContent.rootFolder, "name")
+        } finally {
+            try {
+                port.logout(serviceContent.sessionManager)
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
+
+
+
+    fun <T> authenticated(block: (port: VimPortType) -> T): T {
         rep@ while (true) {
             try {
                 return unauthenticated(block)
@@ -52,6 +71,10 @@ class VimWrapper(
                 throw e
             }
         }
+    }
+
+    fun getNameProperty(obj: ManagedObjectReference): String {
+        return this.getProperty(obj, "name") as String
     }
 
     fun getProperty(obj: ManagedObjectReference, name: String): Any {
@@ -75,21 +98,40 @@ class VimWrapper(
 
             val content = retrieveResult.objects[0]
             if (content.missingSet.isEmpty()) {
-                assert(content.propSet.size == 1)
+                if (content.propSet.size != 1) {
+                    throw RuntimeException("Property $name is not in missing set, but its value is not defined")
+                }
                 return content.propSet[0].getVal()
             }
 
             for (missing in content.missingSet) {
                 if (missing.fault.fault !is NotAuthenticated) {
+                    if (missing.fault.fault is InvalidProperty) {
+                        throw RuntimeException("Invalid property '$name' - error message: ${missing.fault.localizedMessage ?: missing.fault.fault.faultMessage}")
+                    }
                     throw RuntimeException(missing.fault.localizedMessage)
                 }
             }
 
-            doLogin(content.missingSet[0].fault.localizedMessage)
+            /// missing -> NotAuthenticated
+            doLogin(content.missingSet[0].fault.localizedMessage ?: "Not Authenticated")
         }
     }
 
+    fun getEntities(managedObjectReference: ManagedObjectReference, propertyName : String): Any {
+        return getProperty(managedObjectReference, propertyName)
+    }
+
+
+    fun getFolderVirtualMachines(instanceFolder: ManagedObjectReference): List<ManagedObjectReference> {
+        val children = getProperty(instanceFolder, "childEntity") as ArrayOfManagedObjectReference
+
+        return children.managedObjectReference.filter { mof -> mof.type == VM_TYPE }
+    }
+
+
     companion object {
+        const val VM_TYPE = "VirtualMachine"
         val serviceInstance = ManagedObjectReference().apply {
             type = "ServiceInstance"
             value = "ServiceInstance"

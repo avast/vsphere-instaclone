@@ -4,4 +4,6 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd"
        default-autowire="constructor">
   <bean class="com.avast.teamcity.plugins.instaclone.VmwareInstacloneAgentPlugin"/>
+  <bean class="com.avast.teamcity.plugins.instaclone.buildstep.HandlerBuildProcessManager"/>
+  <bean class="com.avast.teamcity.plugins.instaclone.buildstep.InstaCloneBuildStepRunner"/>
 </beans>

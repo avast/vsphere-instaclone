@@ -1,0 +1,13 @@
+{
+  "extProjectId": "",
+  "profileId": "",
+  "profileName": "",
+  "description": "description2",
+  "enabled": true,
+  "customProfileParameters": {
+    "vmwareInstacloneImages": "{\"image-name2\": {\"template\": \"datacenter/vm/tc-agent-template2\",\"instanceFolder\": \"datacenter/vm/tc-agents\",\"maxInstances\": 10}}",
+    "vmwareInstacloneUsername": "username",
+    "vmwareInstaclonePassword": "password2",
+    "vmwareInstacloneSdkUrl": "http://vcsim:8989/sdk"
+  }
+}

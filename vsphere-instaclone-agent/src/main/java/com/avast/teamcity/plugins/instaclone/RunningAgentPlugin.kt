@@ -3,11 +3,12 @@ package com.avast.teamcity.plugins.instaclone
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.openapi.diagnostic.Logger
 import jetbrains.buildServer.CommandLineExecutor
-import jetbrains.buildServer.agent.*
+import jetbrains.buildServer.agent.BuildAgent
+import jetbrains.buildServer.agent.BuildAgentConfiguration
+import jetbrains.buildServer.agent.BuildAgentConfigurationEx
 import jetbrains.buildServer.agent.impl.BuildAgentEx
 import org.json.JSONObject
 import java.io.File
-import java.time.Duration
 
 class RunningAgentPlugin(private val agent: BuildAgent) {
 

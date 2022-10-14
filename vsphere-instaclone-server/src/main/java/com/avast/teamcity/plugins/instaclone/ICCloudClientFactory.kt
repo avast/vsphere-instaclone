@@ -1,19 +1,28 @@
 package com.avast.teamcity.plugins.instaclone
 
+import com.avast.teamcity.plugins.instaclone.web.service.VCenterAccountService
+import com.fasterxml.jackson.core.JsonFactory
+import com.fasterxml.jackson.core.format.DataFormatDetector
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.vmware.vim25.VimPortType
 import com.vmware.vim25.VimService
 import jetbrains.buildServer.clouds.*
 import jetbrains.buildServer.clouds.server.CloudEventAdapter
 import jetbrains.buildServer.clouds.server.CloudEventDispatcher
-import jetbrains.buildServer.serverSide.*
+import jetbrains.buildServer.serverSide.AgentDescription
+import jetbrains.buildServer.serverSide.BuildAgentManager
+import jetbrains.buildServer.serverSide.PropertiesProcessor
+import jetbrains.buildServer.serverSide.SBuildAgent
 import jetbrains.buildServer.serverSide.agentPools.AgentPoolManager
 import jetbrains.buildServer.web.openapi.PluginDescriptor
-import org.apache.commons.io.IOUtils
-import java.io.IOException
 import java.util.*
 import javax.xml.ws.BindingProvider
 
-fun<T> ClassLoader.inContext(block: () -> T): T {
+fun <T> ClassLoader.inContext(block: () -> T): T {
     val currentThread = Thread.currentThread()
     val prevClassLoader = currentThread.contextClassLoader
     currentThread.contextClassLoader = this
@@ -25,19 +34,15 @@ fun<T> ClassLoader.inContext(block: () -> T): T {
 }
 
 class ICCloudClientFactory(
-        private val pluginClassLoader: ClassLoader,
-        private val pluginDescriptor: PluginDescriptor,
-        cloudEventDispatcher: CloudEventDispatcher,
-        private val agentPoolManager: AgentPoolManager,
-        private val buildAgentManager: BuildAgentManager) : CloudClientFactory {
+    private val pluginClassLoader: ClassLoader,
+    private val pluginDescriptor: PluginDescriptor,
+    cloudEventDispatcher: CloudEventDispatcher,
+    private val agentPoolManager: AgentPoolManager,
+    private val buildAgentManager: BuildAgentManager,
+    private val vCenterAccountService: VCenterAccountService
+) : CloudClientFactory {
 
-    private val defaultImagesJson: String = try {
-        IOUtils.toString(
-                javaClass.getResourceAsStream("/samples/imageProfileConfig.json"),
-                "UTF-8")
-    } catch (e: IOException) {
-        throw RuntimeException("Failed to get resource content", e)
-    }
+    private val defaultImagesJson: String = javaClass.getResource("/samples/imageProfileConfig.yaml")!!.readText()
 
     private val vimService = pluginClassLoader.inContext {
         VimService()
@@ -46,64 +51,109 @@ class ICCloudClientFactory(
     init {
         cloudEventDispatcher.addListener(object : CloudEventAdapter() {
             override fun instanceAgentMatched(
-                    profile: CloudProfile,
-                    instance: CloudInstance,
-                    agent: SBuildAgent) {
+                profile: CloudProfile,
+                instance: CloudInstance,
+                agent: SBuildAgent
+            ) {
                 if (instance is ICCloudInstance) {
                     instance.matchedAgentId = agent.id
                 }
             }
         })
-
     }
 
-    private fun getVimPort(sdkUrl: String?): VimPortType {
-        val port = vimService.vimPort
-        val requestContext = (port as BindingProvider).requestContext
+    fun getVimPort(sdkUrl: String?): VimPortType {
+        val vimPort = vimService.vimPort
+        val requestContext = (vimPort as BindingProvider).requestContext
         requestContext[BindingProvider.ENDPOINT_ADDRESS_PROPERTY] = sdkUrl
         requestContext[BindingProvider.SESSION_MAINTAIN_PROPERTY] = true
-        return port
+        return vimPort
     }
 
-    override fun createNewClient(cloudState: CloudState,
-                                 cloudClientParameters: CloudClientParameters): CloudClientEx {
+    override fun createNewClient(
+        cloudState: CloudState,
+        cloudClientParameters: CloudClientParameters
+    ): CloudClientEx {
         return pluginClassLoader.inContext {
-            val profileUuid = cloudClientParameters.getParameter("vmwareInstacloneProfileUuid")!!
-            val sdkUrl = cloudClientParameters.getParameter("vmwareInstacloneSdkUrl")
-            val port = getVimPort(sdkUrl)
-            val username = cloudClientParameters.getParameter("vmwareInstacloneUsername")!!
-            val password = cloudClientParameters.getParameter("vmwareInstaclonePassword")!!
-            val imageConfig = cloudClientParameters.getParameter("vmwareInstacloneImages")!!
-            val vim = VimWrapper(port, username, password, pluginClassLoader)
-            ICCloudClient(vim, buildAgentManager, agentPoolManager, profileUuid, imageConfig)
+            val profileUuid = cloudClientParameters.getParameter(PROP_PROFILE_UUID)!!
+            val vCenterAccountId = cloudClientParameters.getParameter(PROP_VCENTER_ACCOUNT)!!
+            val account = vCenterAccountService.getAccountById(vCenterAccountId)!!
+            val vimPort = getVimPort(account.url)
+            val imageConfig = cloudClientParameters.getParameter(PROP_IMAGES)!!
+            val vim = VimWrapper(vimPort, vCenterAccountId, vCenterAccountService, pluginClassLoader)
+            ICCloudClient(vim, buildAgentManager, agentPoolManager, profileUuid, parseIcImageConfig(imageConfig))
         }
     }
 
     override fun getCloudCode(): String {
-        return "vmic"
+        return CLOUD_CODE
     }
 
     override fun getDisplayName(): String {
-        return "VMware Instaclone"
+        return "VMware InstacloneV2"
     }
 
-    override fun getEditProfileUrl(): String? {
+    override fun getEditProfileUrl(): String {
         return pluginDescriptor.getPluginResourcesPath("vmware-instaclone-profile-settings.html")
     }
 
     override fun getInitialParameterValues(): Map<String, String> {
-        val params = HashMap<String, String>()
-        params["vmwareInstacloneImages"] = defaultImagesJson
-        params["vmwareInstacloneProfileUuid"] = UUID.randomUUID().toString()
+        val params = mutableMapOf<String, String>()
+        params[PROP_IMAGES] = defaultImagesJson
+        params[PROP_PROFILE_UUID] = initProfileUUID()
         return params
     }
 
-    override fun getPropertiesProcessor(): PropertiesProcessor {
-        return PropertiesProcessor { emptyList() }
-    }
 
     override fun canBeAgentOfType(agentDescription: AgentDescription): Boolean {
         val config = agentDescription.configurationParameters
         return config.containsKey("vsphere-instaclone.instance.uuid")
     }
+
+    override fun getPropertiesProcessor(): PropertiesProcessor {
+        // perform validation
+        return ConfigPropertiesProcessor(pluginClassLoader, this, vCenterAccountService)
+    }
+
+    companion object {
+
+        internal const val CLOUD_CODE = "vmic2"
+        internal const val CLOUD_CODE_WEB = "vmic"
+        internal const val PROP_CONNECTION_FAILED = "vmwareInstacloneConnectionInfo"
+        internal const val PROP_SDKURL = "vmwareInstacloneSdkUrl"
+        internal const val PROP_USERNAME = "vmwareInstacloneUsername"
+        internal const val PROP_PASSWORD = "vmwareInstaclonePassword"
+        internal const val PROP_PROFILE_UUID = "vmwareInstacloneProfileUuid"
+        internal const val PROP_VCENTER_ACCOUNT = "vmwareInstacloneVCenterAccount"
+        internal const val PROP_VCENTER_ACCOUNT_HASH = "vmwareInstacloneVCenterAccountHash"
+        internal const val PROP_IMAGES: String = "vmwareInstacloneImages"
+
+        val REQUIRED_PROPS = arrayOf(PROP_VCENTER_ACCOUNT, PROP_IMAGES)
+
+        private val formatDetector = DataFormatDetector(mutableListOf(YAMLFactory(), JsonFactory()))
+        private val jsonMapper = jacksonObjectMapper()
+        private val yamlMapper = ObjectMapper(YAMLFactory()).registerKotlinModule()
+
+        fun getImageConfigMapper(imageConfig: String): ObjectMapper {
+            val findFormat = formatDetector.findFormat(imageConfig.toByteArray())
+            if (!findFormat.hasMatch()) {
+                throw RuntimeException("Cannot detect input format for imageConfig $imageConfig")
+            }
+
+            return if (findFormat.match.formatName == jsonMapper.factory.formatName) {
+                jsonMapper
+            } else {
+                yamlMapper
+            }
+        }
+
+        fun parseIcImageConfig(imageConfig: String): Map<String, ICImageConfig> {
+            return getImageConfigMapper(imageConfig).readValue(imageConfig)
+        }
+
+        fun initProfileUUID() : String {
+            return UUID.randomUUID().toString()
+        }
+    }
+
 }

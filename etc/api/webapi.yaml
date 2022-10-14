@@ -1,0 +1,333 @@
+openapi: 3.0.3
+info:
+  title: VSphere-Instaclode TC REST API
+  description: extended API for managing VSphereInstaclone profiles
+  version: 1.0.0
+servers:
+  - url: 'http://localhost:8181'
+paths:
+
+  /app/vmic/remove:
+    description: removes profile by given ids
+    post:
+      responses:
+        200:
+          description: The resource was deleted successfully
+        403:
+          description: not enough permissions to perform operation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/removeProfileRequest"
+  /app/vmic/update:
+    post:
+      description: Update given VMIC profile
+      responses:
+        403:
+          description: not enough permissions to perform operation
+        200:
+          $ref: "#/components/responses/cloudProfileResponse"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/cloudProfileUpdateRequest"
+      parameters:
+        - name: clean
+          in: "path"
+          schema:
+            type: boolean
+            default: false
+            description: if the value is true, the cloudImagesParameters are wiped on update profile
+  /app/vmic/create:
+    post:
+      description: Create a new given VMIC profile
+      responses:
+        403:
+          description: not enough permissions to perform operation
+        200:
+          $ref: "#/components/responses/cloudProfileResponse"
+      requestBody:
+        content:
+          application/json:
+            schema:
+                $ref: "#/components/schemas/cloudProfileCreateRequest"
+  /app/vmic/list:
+    get:
+      description: List all VCSphere instaclode plugin profiles
+      responses:
+        403:
+          description: not enough permissions to perform operation
+        200:
+          $ref: "#/components/responses/profileInfoResponse"
+      parameters:
+        - name: cloudCode
+          in: "path"
+          schema:
+            type: string
+            default: "vmic"
+            description: Parameter is used for debug purposes to list another version of VMIC plugin profiles
+  /app/vmic/accounts/list:
+    get:
+      description: List all stored vCenter accounts without usernames and passwords, just IDs and URLs
+      responses:
+        403:
+          description: not enough permissions to perform operation
+        200:
+          $ref: "#/components/responses/listAccountsResponse"
+
+  /app/vmic/accounts/update:
+    post:
+      description: |
+        Update all stored vCenter accounts. Posted data are encrypted with a random unique AES key and the key is encrypted with RSA public key.
+        The private key from the keypair is stored on the TC server to be able to decrypt accounts list when needed.
+        Account id must be unique.
+        Accounts.yaml example:
+        ```yaml
+          #accounts list:
+          accounts:
+            - id: vCenterNewYork
+              url: https://vCenterURL/sdk
+              username: <vCenter SDK username>
+              password: <vCenter SDK password>
+            - id: vCenterPrague
+              url: https://vCenterURL/sdk
+              username: <vCenter SDK username>
+              password: <vCenter SDK password>
+        ```
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/accountsUpdateRequest"
+      responses:
+        403:
+          description: not enough permissions to perform operation
+        200:
+          description: The accounts were updated successfully
+
+components:
+  schemas:
+    imageConfig:
+      type: object
+      required:
+        - template
+        - instanceFolder
+      properties:
+        template:
+          type: string
+        instanceFolder:
+          type: string
+        resourcePool:
+          type: string
+        datastore:
+          type: string
+        maxInstances:
+          type: integer
+          minimum: 1
+        agentPool:
+          oneOf:
+            - type: integer
+            - type: string
+        network:
+          type: array
+          items:
+            allOf:
+              - type: string
+        shutdownTimeout:
+          type: integer
+
+    removeProfileRequest:
+      type: object
+      properties:
+        extProjectId:
+          type: string
+          description: project external id (visible for user)
+        profileId:
+          type: string
+          description: profile Id
+    cloudProfileUpdateRequest:
+      type: object
+      properties:
+        extProjectId:
+          type: string
+          description: project external id (visible for user)
+        profileId:
+          type: string
+          description: profile Id
+        profileName:
+          type: string
+          description: profile name
+        description:
+          type: string
+          description: profile description
+        enabled:
+          type: boolean
+          description: if the profile is enabled in TC
+        terminateIdleTime:
+          type: integer
+          default: 1800000
+          description: value in millis, client terminate on idle, default 30 mins
+        customProfileParameters:
+          type: object
+          additionalProperties:
+            type: string
+
+    cloudProfileCreateRequest:
+      type: object
+      properties:
+        cloudCode:
+          type: string
+          description: name of the cloud plugin
+        extProjectId:
+          type: string
+          description: project external id (visible for user)
+        profileName:
+          type: string
+          description: profile name
+        description:
+          type: string
+          description: profile description
+        enabled:
+          type: boolean
+          description: if the profile is enabled in TC
+        terminateIdleTime:
+          type: integer
+          default: 1800000
+          description: value in millis, client terminate on idle, default 30 mins
+        customProfileParameters:
+          type: object
+          additionalProperties:
+            type: string
+    accountsUpdateRequest:
+      type: object
+      required: ["accounts", "aes256"]
+      properties:
+        accounts:
+          type: string
+          description: Base64 encrypted value. The encryption is done by symmetric cypher AES (with AES256 key)
+        aes256:
+          type: string
+          description: Base64 encrypted AES256 key value. The key is encrypted by RSA public key.
+
+    cloudProfile:
+      type: object
+      required: [ "profileName", "projectId", "profileId", "isEnabled", "profileProperties" ]
+      properties:
+        description:
+          type: string
+          description: profile description
+        profileName:
+          type: string
+          description: profile name
+        projectId:
+          type: string
+          description: project ID
+        profileId:
+          type: string
+          description: profile id
+        cloudCode:
+          type: string
+          description: cloud code - 'VMIC' for VSphere instaclone profiles
+        terminateIdleTime:
+          type: integer
+          description: Time to wait before idle agent is terminated
+        isEnabled:
+          type: boolean
+          description: if the profile is enabled
+        profileProperties:
+          type: object
+          additionalProperties:
+            type: string
+
+    account:
+      type: object
+      required: ["id", "url"]
+      properties:
+        id:
+          type: string
+          description: account id
+        url:
+          type: string
+          description: vCenter server URL
+    profileInfo:
+      type: object
+      required: [ "projectName", "projectExtId", "profileId", "profileEnabled", "profileParameters", "sdkUrl", "templates", "vCenterAccount" ]
+      properties:
+        projectName:
+          type: string
+          description: project name
+        profileDescription:
+          type: string
+          description: profile description
+        projectExtId:
+          type: string
+          description: project external id (visible for user)
+        profileId:
+          type: string
+          description: profile id
+        profileEnabled:
+          type: boolean
+          description: if the profile is enabled
+        profileParameters:
+          type: object
+          additionalProperties:
+            type: string
+        sdkUrl:
+          type: string
+        vCenterAccount:
+          type: string
+          description: id of the account used for connection to vCenter
+        templates:
+          type: array
+          items:
+            allOf:
+              - type: string
+        imageConfigJson:
+          type: object
+          properties:
+            default:
+              type: string
+          additionalProperties:
+            $ref: "#/components/schemas/imageConfig"
+    profileInfoList:
+      type: array
+      items:
+        $ref: "#/components/schemas/profileInfo"
+    accountsList:
+      type: array
+      items:
+        $ref: "#/components/schemas/account"
+#  requestBodies:
+#    cloudProfileCreateRequestBody:
+#      description: cloud profile description for VMIC plugin
+#      content:
+#        application/json:
+#          schema:
+#            $ref: "#/components/schemas/profileInfo"
+#    cloudProfileUpdateRequestBody:
+#      description: cloud profile description for VMIC plugin
+#      content:
+#        application/json:
+#          schema:
+#            $ref: "#/components/schemas/cloudProfileUpdateRequest"
+  responses:
+    listAccountsResponse:
+      description: profile info with image parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/accountsList"
+    profileInfoResponse:
+      description: profile info with image parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/profileInfo"
+    cloudProfileResponse:
+      description: profile info with image parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/cloudProfile"

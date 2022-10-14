@@ -2,6 +2,10 @@
 
 Use VMware instant clone technology to spawn TeamCity cloud agent quickly.
 
+## Content
+[//]: https://imthenachoman.github.io/nGitHubTOC
+[//]: https://ecotrust-canada.github.io/markdown-toc/
+
 ## Installation
 
 1. Download the plugin .zip file from this [repo's releases](https://github.com/avast/vsphere-instaclone/releases).
@@ -34,6 +38,8 @@ Finally, provide one or more image configurations.
             "instanceFolder": "datacenter/vm/tc-agents",
             "maxInstances": 50,
             "agentPool": "mypool",
+            "resourcePool": "myResourcePool",
+            "datastore": "myDataStore",
             "network": "datacenter/network/agent-network"
         }
     }
@@ -96,3 +102,100 @@ Adjust for other systems and your requirements.
 If set, the shutdown script is run after the agent has unregistered
 from the server, but before the machine is deleted.
 This is an ideal place to release the machine's IP address, for example.
+
+## REST API
+
+### Profiles CRUD
+This plugin extends TC REST API to be able to list, create, update, remove VSphere instaclone profiles. 
+[The extended API is described using Swagger aka OpenAPI v3](/etc/api/webapi.yaml).
+
+### VSphere Accounts 
+Accounts are defined centrally and every cloud profile is linked with an account ID.    
+To set up list of available accounts you need to use [REST API call - /app/vmic/accounts/](/etc/api/webapi.yaml).
+Posted data are encrypted with a random unique AES key, and the key is encrypted with RSA public key.
+The private key from the keypair is physically stored on the TC server to be able to decrypt accounts list when needed. The keys should be saved in the PEM format. 
+
+Account id must be unique.
+
+Cloud profile without proper defined account id is rejected.
+
+#### Creating RSA Keypair using OpenSSL
+```bash
+# generate a private key with the correct length
+openssl genrsa -out accounts-pk.pem 2048
+```
+
+```bash
+# generate corresponding public key
+openssl rsa -in accounts-pk.pem -pubout -out public-key.pem
+```
+
+#### Account Private key location
+The key should be placed at one of this location (ordered by higher priority): 
+- `accountsPkPath` parameter in the plugin descriptor `teamcity-plugin.xml` 
+- TC property `teamcity.vsphereinstaclone.accountsPkPath`
+- file `${userHome}/vsphereinstaclone/accounts-pk.pem`
+
+
+## Extended UI
+There is a new "flat" view for profiles used defined by this plugin - `http://<teamcityurl>/vmic.html`. 
+It's necessary to set up TC `MANAGE_AGENT_CLOUDS` permission for user. 
+
+## VSphere instaclone TC build step
+In case you always start to build from the clean image it might get handy to create some middle state with created files/artifacts.
+This plugin defines a new build step `VSphere Instaclone` and it triggers creating a new instaclone on top of the running build. The cloning operation is blocking, after that the build continues.  
+This new generated image can be reused for another defined builds (typically internal builds only) to speed up building - e.g. testing.
+It helps to speed up building while it preserves security of the build process.
+
+### How does it work?
+Consider 2 defined builds - one for internal builds and one for production environment. 
+Production environment build always starts from the clean image environment, and it produces several artifacts during a build (e.g. linked libraries). When the artifacts are created a new clone is created (via the build step) and it can be reused for the internal build.  
+Internal build always selects the latest "snapshot version" of the generated image for its run. 
+The new name for a newly generated image is based on `image-name` configuration, and it is generated as follows:  
+
+`<image-name>-<templateSuffix>@timestampMillis`
+
+#### Example
+*Given:*
+ - `image-name` = `XXImage-NameXX`
+ - `templateSuffix` = `linkedDone` 
+
+where `templateSuffix` value is a configuration property for VSphere instaclone TC build step.
+
+*Result:*  - `XXImage-NameXX-linkedDone@0123456789`   
+
+The internal build `template` path name configuration has to end with `@` character. The image template is selected by the highest template timestamp. Also, the template image virtual machine must be in **freezed** status state. 
+
+This image demonstrates the cloning process
+![Cloning Process](doc/instaclone.png)
+
+
+#### Internal build definition example
+```
+  "my-internal-image-name": {
+      "template": "datacenter/vm/XXImage-NameXX-linkedDone@",
+      "instanceFolder": "datacenter/vm/tc-agents",
+      ...  
+  }
+```
+
+#### Technical details
+The build step (the agent side) sends request via [TC Service message](https://www.jetbrains.com/help/teamcity/service-messages.html) to the TC server. This message event triggers cloning process, and it's launched asynchronously. 
+The message has a following structure:
+```
+   ##teamcity[createVCenterInstaClone templateNameSuffix='<templateNameSuffix>' uuid='<uuid>' cloneNumberLimit='<cloneNumberLimit>']
+```
+where 
+- `templateNameSuffix` is a template suffix for a new clone template name 
+- `uuid` is a pseudo-random generated string to identify agent sender 
+- `cloneNumberLimit` defines how many older clones should be preserved. Min value is 1 
+
+The parameter values are taken from the TC Build Step definition:
+
+![Cloning Process](doc/buildstepsettings.png)
+
+When the cloning finishes TC server sends information back about cloning result (fail/success) to the agent responsible for triggering action. 
+The cloning process consists of several steps and in the end the number of already existing clones is limited to defined number.
+
+![VSphere build step](doc/buildstep.png)
+
