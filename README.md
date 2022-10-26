@@ -26,6 +26,7 @@ to search for machines and perform the instant clone operation:
 * Datastore.AllocateSpace
 * Resource.AssignVMToPool
 
+
 Finally, provide one or more image configurations.
 
     {
